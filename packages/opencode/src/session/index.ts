@@ -127,6 +127,7 @@ export namespace Session {
       workspaceID: WorkspaceID.zod.optional(),
       directory: z.string(),
       parentID: SessionID.zod.optional(),
+      depth: z.number().optional().describe("Nesting depth of session (0 for root, increments for subagent sessions)"),
       summary: z
         .object({
           additions: z.number(),
@@ -302,6 +303,14 @@ export namespace Session {
     directory: string
     permission?: PermissionNext.Ruleset
   }) {
+    // Compute depth: root sessions have depth 0, child sessions have parent's depth + 1
+    let depth = 0
+    if (input.parentID) {
+      const parent = await Storage.read<Info>(["session", Instance.project.id, input.parentID])
+      if (parent) {
+        depth = (parent.depth ?? 0) + 1
+      }
+    }
     const result: Info = {
       id: SessionID.descending(input.id),
       slug: Slug.create(),
@@ -310,6 +319,7 @@ export namespace Session {
       directory: input.directory,
       workspaceID: input.workspaceID,
       parentID: input.parentID,
+      depth,
       title: input.title ?? createDefaultTitle(!!input.parentID),
       permission: input.permission,
       time: {

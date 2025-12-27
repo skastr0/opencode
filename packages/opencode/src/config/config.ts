@@ -709,6 +709,17 @@ export namespace Config {
   })
   export type Skills = z.infer<typeof Skills>
 
+  export const Thinking = z
+    .object({
+      effort: z.enum(["low", "medium", "high"]).optional().describe("Thinking effort level"),
+      budgetTokens: z.number().int().positive().optional().describe("Token budget for thinking"),
+    })
+    .strict()
+    .meta({
+      ref: "ThinkingConfig",
+    })
+  export type Thinking = z.infer<typeof Thinking>
+
   export const Agent = z
     .object({
       model: ModelId.optional(),
@@ -742,6 +753,7 @@ export namespace Config {
         .optional()
         .describe("Maximum number of agentic iterations before forcing text-only response"),
       maxSteps: z.number().int().positive().optional().describe("@deprecated Use 'steps' field instead."),
+      thinking: Thinking.optional().describe("Thinking/reasoning configuration for the agent"),
       permission: Permission.optional(),
     })
     .catchall(z.any())
@@ -1225,6 +1237,14 @@ export namespace Config {
             .positive()
             .optional()
             .describe("Timeout in milliseconds for model context protocol (MCP) requests"),
+          max_delegation_depth: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe(
+              "Maximum depth of subagent delegation. 0 or undefined means subagents cannot spawn other subagents. Set to 1 to allow one level of nesting, 2 for two levels, etc.",
+            ),
         })
         .optional(),
     })
