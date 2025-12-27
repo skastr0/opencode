@@ -956,7 +956,13 @@ export type EventWorktreeFailed = {
     message: string
   }
 }
-
+export type EventSessionHandoffCompleted = {
+  type: "session.handoff.completed"
+  properties: {
+    sourceSessionID: string
+    targetSessionID: string
+  }
+}
 export type Event =
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
@@ -1003,6 +1009,7 @@ export type Event =
   | EventPtyDeleted
   | EventWorktreeReady
   | EventWorktreeFailed
+  | EventSessionHandoffCompleted
 
 export type GlobalEvent = {
   directory: string
@@ -4741,6 +4748,49 @@ export type TuiControlResponseResponses = {
 }
 
 export type TuiControlResponseResponse = TuiControlResponseResponses[keyof TuiControlResponseResponses]
+
+export type SessionHandoffData = {
+  body?: {
+    /**
+     * Handoff instruction/focus
+     */
+    instruction: string
+    modelID: string
+    providerID: string
+  }
+  path: {
+    /**
+     * Source session ID
+     */
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/handoff"
+}
+
+export type SessionHandoffErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionHandoffError = SessionHandoffErrors[keyof SessionHandoffErrors]
+
+export type SessionHandoffResponses = {
+  /**
+   * New session created with handoff context
+   */
+  200: Session
+}
+
+export type SessionHandoffResponse = SessionHandoffResponses[keyof SessionHandoffResponses]
 
 export type InstanceDisposeData = {
   body?: never

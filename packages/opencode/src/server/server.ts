@@ -26,6 +26,7 @@ import { WorkspaceContext } from "../control-plane/workspace-context"
 import { WorkspaceID } from "../control-plane/schema"
 import { ProviderID } from "../provider/schema"
 import { WorkspaceRouterMiddleware } from "../control-plane/workspace-router-middleware"
+import { Session } from "../session"
 import { ProjectRoutes } from "./routes/project"
 import { SessionRoutes } from "./routes/session"
 import { PtyRoutes } from "./routes/pty"
@@ -46,6 +47,7 @@ import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
 import { MDNS } from "./mdns"
 import { lazy } from "@/util/lazy"
+import { SessionHandoff } from "../session/handoff"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -252,6 +254,51 @@ export namespace Server {
       .route("/", FileRoutes())
       .route("/mcp", McpRoutes())
       .route("/tui", TuiRoutes())
+      .post(
+        "/session/:sessionID/handoff",
+        describeRoute({
+          description: "Handoff session to a new session with summarized context",
+          operationId: "session.handoff",
+          responses: {
+            200: {
+              description: "New session created with handoff context",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info),
+                },
+              },
+            },
+            ...errors(400, 404),
+          },
+        }),
+        validator(
+          "param",
+          z.object({
+            sessionID: z.string().meta({ description: "Source session ID" }),
+          }),
+        ),
+        validator(
+          "json",
+          z.object({
+            instruction: z.string().meta({ description: "Handoff instruction/focus" }),
+            modelID: z.string(),
+            providerID: z.string(),
+          }),
+        ),
+        async (c) => {
+          const sessionID = c.req.valid("param").sessionID
+          const body = c.req.valid("json")
+          const result = await SessionHandoff.create({
+            sessionID,
+            instruction: body.instruction,
+            model: {
+              providerID: body.providerID,
+              modelID: body.modelID,
+            },
+          })
+          return c.json(result)
+        },
+      )
       .post(
         "/instance/dispose",
         describeRoute({
