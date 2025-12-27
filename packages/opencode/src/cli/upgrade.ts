@@ -4,6 +4,9 @@ import { Flag } from "@/flag/flag"
 import { Installation } from "@/installation"
 
 export async function upgrade() {
+  // Never auto-upgrade local development builds
+  if (Installation.isLocal()) return
+
   const config = await Config.global()
   const method = await Installation.method()
   const latest = await Installation.latest(method).catch(() => {})
