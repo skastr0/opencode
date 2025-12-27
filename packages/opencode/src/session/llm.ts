@@ -22,6 +22,7 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
+import { ThinkingEffort } from "./thinking-effort"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
@@ -95,15 +96,46 @@ export namespace LLM {
 
     const variant =
       !input.small && input.model.variants && input.user.variant ? input.model.variants[input.user.variant] : {}
-    const base = input.small
-      ? ProviderTransform.smallOptions(input.model)
-      : ProviderTransform.options({
-          model: input.model,
-          sessionID: input.sessionID,
-          providerOptions: provider.options,
-        })
+
+    // Determine thinking config: agent config takes precedence over pattern detection
+    const agentThinking = input.agent.thinking
+    let thinkingLevel: ThinkingEffort.Level | undefined
+
+    if (agentThinking) {
+      // Agent-level thinking config overrides pattern detection
+      thinkingLevel = {
+        effort: agentThinking.effort ?? "medium",
+        budgetTokens: agentThinking.budgetTokens ?? 10_000,
+      }
+    } else {
+      // Fall back to pattern detection from user text
+      const lastUserMsg = input.messages.findLast((m) => m.role === "user")
+      const userText = lastUserMsg
+        ? typeof lastUserMsg.content === "string"
+          ? lastUserMsg.content
+          : lastUserMsg.content
+              .filter((p): p is { type: "text"; text: string } => p.type === "text")
+              .map((p) => p.text)
+              .join(" ")
+        : ""
+      thinkingLevel = ThinkingEffort.detect(userText)
+    }
+
+    // Build provider-specific thinking options
+    const thinkingOptions = thinkingLevel ? buildThinkingOptions(input.model, thinkingLevel) : {}
+
+    // Build options in two stages to avoid TypeScript type depth limits
+    const baseOptions = {
+      ...ProviderTransform.options({
+        model: input.model,
+        sessionID: input.sessionID,
+        providerOptions: provider.options,
+      }),
+      ...(input.small ? ProviderTransform.smallOptions(input.model) : {}),
+      ...thinkingOptions,
+    }
     const options: Record<string, any> = pipe(
-      base,
+      baseOptions,
       mergeDeep(input.model.options),
       mergeDeep(input.agent.options),
       mergeDeep(variant),
@@ -146,7 +178,9 @@ export namespace LLM {
     )
 
     const maxOutputTokens =
-      isCodex || provider.id.includes("github-copilot") ? undefined : ProviderTransform.maxOutputTokens(input.model)
+      isCodex || provider.id.includes("github-copilot")
+        ? undefined
+        : ProviderTransform.maxOutputTokens(input.model, options)
 
     const tools = await resolveTools(input)
 
@@ -279,5 +313,55 @@ export namespace LLM {
       }
     }
     return false
+  }
+
+  function buildThinkingOptions(model: Provider.Model, level: ThinkingEffort.Level): Record<string, any> {
+    const npm = model.api.npm
+
+    // Anthropic: thinking.type + budgetTokens + effort
+    if (npm === "@ai-sdk/anthropic") {
+      return {
+        thinking: { type: "enabled" as const, budgetTokens: level.budgetTokens },
+        effort: level.effort,
+      }
+    }
+
+    // OpenAI: reasoningEffort (budgetTokens not supported)
+    if (npm === "@ai-sdk/openai" || npm === "@ai-sdk/azure") {
+      return {
+        reasoningEffort: level.effort,
+      }
+    }
+
+    // Google: thinkingConfig with budget or level
+    // Note: Google API treats "high" specially with thinkingLevel, while lower
+    // efforts use explicit token budgets via thinkingBudget
+    if (npm === "@ai-sdk/google" || npm === "@ai-sdk/google-vertex") {
+      // High effort uses thinkingLevel, others use budget
+      if (level.effort === "high") {
+        return {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: "HIGH",
+          },
+        }
+      }
+      return {
+        thinkingConfig: {
+          includeThoughts: true,
+          thinkingBudget: level.budgetTokens,
+        },
+      }
+    }
+
+    // OpenRouter: reasoning.effort
+    if (npm === "@openrouter/ai-sdk-provider") {
+      return {
+        reasoning: { effort: level.effort },
+      }
+    }
+
+    // Unknown provider - return empty (no thinking support)
+    return {}
   }
 }

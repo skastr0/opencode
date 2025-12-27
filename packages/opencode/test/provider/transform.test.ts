@@ -175,6 +175,128 @@ describe("ProviderTransform.options - gpt-5 textVerbosity", () => {
     expect(result.textVerbosity).toBeUndefined()
   })
 })
+describe("ProviderTransform.maxOutputTokens", () => {
+  const createModel = (npm: string, output: number) =>
+    ({
+      id: "test/test-model",
+      providerID: "test",
+      api: {
+        id: "test-model",
+        url: "https://api.test.com",
+        npm,
+      },
+      name: "Test Model",
+      capabilities: {
+        temperature: true,
+        reasoning: true,
+        attachment: true,
+        toolcall: true,
+        input: { text: true, audio: false, image: true, video: false, pdf: false },
+        output: { text: true, audio: false, image: false, video: false, pdf: false },
+        interleaved: false,
+      },
+      cost: { input: 0.001, output: 0.002, cache: { read: 0.0001, write: 0.0002 } },
+      limit: { context: 128000, output },
+      status: "active",
+      options: {},
+      headers: {},
+      release_date: "2024-01-01",
+    }) as any
+
+  test("returns 32k when modelLimit > 32k", () => {
+    const model = createModel("@ai-sdk/openai", 100000)
+    const result = ProviderTransform.maxOutputTokens(model)
+    expect(result).toBe(OUTPUT_TOKEN_MAX)
+  })
+
+  test("returns modelLimit when modelLimit < 32k", () => {
+    const model = createModel("@ai-sdk/openai", 16000)
+    const result = ProviderTransform.maxOutputTokens(model)
+    expect(result).toBe(16000)
+  })
+
+  describe("azure", () => {
+    test("returns 32k when modelLimit > 32k", () => {
+      const model = createModel("@ai-sdk/azure", 100000)
+      const result = ProviderTransform.maxOutputTokens(model)
+      expect(result).toBe(OUTPUT_TOKEN_MAX)
+    })
+
+    test("returns modelLimit when modelLimit < 32k", () => {
+      const model = createModel("@ai-sdk/azure", 16000)
+      const result = ProviderTransform.maxOutputTokens(model)
+      expect(result).toBe(16000)
+    })
+  })
+
+  describe("bedrock", () => {
+    test("returns 32k when modelLimit > 32k", () => {
+      const model = createModel("@ai-sdk/amazon-bedrock", 100000)
+      const result = ProviderTransform.maxOutputTokens(model)
+      expect(result).toBe(OUTPUT_TOKEN_MAX)
+    })
+
+    test("returns modelLimit when modelLimit < 32k", () => {
+      const model = createModel("@ai-sdk/amazon-bedrock", 16000)
+      const result = ProviderTransform.maxOutputTokens(model)
+      expect(result).toBe(16000)
+    })
+  })
+
+  describe("anthropic without thinking options", () => {
+    test("returns 32k when modelLimit > 32k", () => {
+      const model = createModel("@ai-sdk/anthropic", 100000)
+      const result = ProviderTransform.maxOutputTokens(model)
+      expect(result).toBe(OUTPUT_TOKEN_MAX)
+    })
+
+    test("returns modelLimit when modelLimit < 32k", () => {
+      const model = createModel("@ai-sdk/anthropic", 16000)
+      const result = ProviderTransform.maxOutputTokens(model)
+      expect(result).toBe(16000)
+    })
+  })
+
+  describe("anthropic with thinking options", () => {
+    test("returns 32k when budgetTokens + 32k <= modelLimit", () => {
+      const model = createModel("@ai-sdk/anthropic", 100000)
+      const options = {
+        thinking: {
+          type: "enabled",
+          budgetTokens: 10000,
+        },
+      }
+      const result = ProviderTransform.maxOutputTokens(model, options)
+      // When thinking is enabled (10k), we add standard limit (32k) to it -> 42k total
+      expect(result).toBe(42000)
+    })
+
+    test("returns budgetTokens + standardLimit even if it exceeds modelLimit", () => {
+      const model = createModel("@ai-sdk/anthropic", 50000)
+      const options = {
+        thinking: {
+          type: "enabled",
+          budgetTokens: 30000,
+        },
+      }
+      const result = ProviderTransform.maxOutputTokens(model, options)
+      // Budget (30k) + Standard (32k) = 62k. We trust this over modelLimit (50k).
+      expect(result).toBe(62000)
+    })
+
+    test("returns 32k when thinking type is not enabled", () => {
+      const model = createModel("@ai-sdk/anthropic", 100000)
+      const options = {
+        thinking: {
+          type: "disabled",
+          budgetTokens: 10000,
+        },
+      }
+      const result = ProviderTransform.maxOutputTokens(model, options)
+      expect(result).toBe(OUTPUT_TOKEN_MAX)
+    })
+  })
+})
 
 describe("ProviderTransform.options - gateway", () => {
   const sessionID = "test-session-123"
@@ -373,7 +495,6 @@ describe("ProviderTransform.providerOptions", () => {
     })
   })
 })
-
 describe("ProviderTransform.schema - gemini array items", () => {
   test("adds missing items for array properties", () => {
     const geminiModel = {
@@ -2650,6 +2771,138 @@ describe("ProviderTransform.variants", () => {
       })
       const result = ProviderTransform.variants(model)
       expect(result).toEqual({})
+    })
+  })
+})
+
+describe("ProviderTransform.providerOptions", () => {
+  const anthropicModel = {
+    id: "anthropic/claude-sonnet-4",
+    providerID: "anthropic",
+    api: {
+      id: "claude-sonnet-4-20250514",
+      url: "https://api.anthropic.com",
+      npm: "@ai-sdk/anthropic",
+    },
+    name: "Claude Sonnet 4",
+    capabilities: {
+      temperature: true,
+      reasoning: true,
+      attachment: true,
+      toolcall: true,
+      input: { text: true, audio: false, image: true, video: false, pdf: true },
+      output: { text: true, audio: false, image: false, video: false, pdf: false },
+      interleaved: false,
+    },
+    cost: {
+      input: 0.003,
+      output: 0.015,
+      cache: { read: 0.0003, write: 0.00375 },
+    },
+    limit: {
+      context: 200000,
+      output: 64000,
+    },
+    status: "active",
+    options: {},
+    headers: {},
+  } as any
+
+  test("passes effort option through for anthropic models", () => {
+    const options = {
+      effort: "high",
+      thinking: {
+        type: "enabled",
+        budgetTokens: 32000,
+      },
+    }
+
+    const result = ProviderTransform.providerOptions(anthropicModel, options)
+
+    expect(result).toEqual({
+      anthropic: {
+        effort: "high",
+        thinking: {
+          type: "enabled",
+          budgetTokens: 32000,
+        },
+      },
+    })
+  })
+
+  test("passes effort option alone without thinking for anthropic models", () => {
+    const options = {
+      effort: "medium",
+    }
+
+    const result = ProviderTransform.providerOptions(anthropicModel, options)
+
+    expect(result).toEqual({
+      anthropic: {
+        effort: "medium",
+      },
+    })
+  })
+
+  test("passes thinking option without effort for anthropic models", () => {
+    const options = {
+      thinking: {
+        type: "enabled",
+        budgetTokens: 10000,
+      },
+    }
+
+    const result = ProviderTransform.providerOptions(anthropicModel, options)
+
+    expect(result).toEqual({
+      anthropic: {
+        thinking: {
+          type: "enabled",
+          budgetTokens: 10000,
+        },
+      },
+    })
+  })
+
+  test("wraps options under openai key for openai models", () => {
+    const openaiModel = {
+      ...anthropicModel,
+      providerID: "openai",
+      api: {
+        id: "gpt-4",
+        url: "https://api.openai.com",
+        npm: "@ai-sdk/openai",
+      },
+    }
+
+    const options = { reasoningEffort: "high" }
+    const result = ProviderTransform.providerOptions(openaiModel, options)
+
+    expect(result).toEqual({
+      openai: {
+        reasoningEffort: "high",
+      },
+    })
+  })
+
+  test("wraps options under bedrock key for amazon-bedrock models", () => {
+    const bedrockModel = {
+      ...anthropicModel,
+      providerID: "bedrock",
+      api: {
+        id: "anthropic.claude-3-sonnet",
+        url: "https://bedrock.us-east-1.amazonaws.com",
+        npm: "@ai-sdk/amazon-bedrock",
+      },
+    }
+
+    const options = { effort: "high" }
+    const result = ProviderTransform.providerOptions(bedrockModel, options)
+
+    expect(result).toEqual({
+      bedrock: {
+        effort: "high",
+      },
     })
   })
 })
