@@ -2044,20 +2044,53 @@ function Task(props: ToolProps<typeof TaskTool>) {
   })
 
   return (
-    <InlineTool
-      icon="│"
-      spinner={isRunning()}
-      complete={props.input.description}
-      pending="Delegating..."
-      part={props.part}
-      onClick={() => {
-        if (props.metadata.sessionId) {
-          navigate({ type: "session", sessionID: props.metadata.sessionId })
-        }
-      }}
-    >
-      {content()}
-    </InlineTool>
+    <Switch>
+      <Match when={props.input.description || props.input.subagent_type}>
+        <BlockTool
+          title={"# " + Locale.titlecase(props.input.subagent_type ?? "unknown") + " Task"}
+          onClick={
+            props.metadata.sessionId
+              ? () => navigate({ type: "session", sessionID: props.metadata.sessionId! })
+              : undefined
+          }
+          part={props.part}
+          spinner={isRunning()}
+        >
+          <box>
+            <text style={{ fg: theme.textMuted }}>
+              {props.input.description} ({tools().length} toolcalls)
+            </text>
+            <Show when={current()}>
+              {(item) => {
+                const task = item()
+                const title = task.state.status === "completed" ? (task.state as any).title : ""
+                const marker = task.isSubagent ? "○" : ""
+                const suffix = task.isSubagent ? " [subagent]" : ""
+                return (
+                  <text style={{ fg: task.state.status === "error" ? theme.error : theme.textMuted }}>
+                    └ {marker}
+                    {marker ? " " : ""}
+                    {Locale.titlecase(task.tool)} {title}
+                    {suffix}
+                  </text>
+                )
+              }}
+            </Show>
+          </box>
+          <Show when={props.metadata.sessionId}>
+            <text fg={theme.text}>
+              {keybind.print("session_child_first")}
+              <span style={{ fg: theme.textMuted }}> view subagents</span>
+            </text>
+          </Show>
+        </BlockTool>
+      </Match>
+      <Match when={true}>
+        <InlineTool icon="#" pending="Delegating..." complete={props.input.subagent_type} part={props.part}>
+          {props.input.subagent_type} Task {props.input.description}
+        </InlineTool>
+      </Match>
+    </Switch>
   )
 }
 
