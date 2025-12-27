@@ -50,6 +50,7 @@ export type AutocompleteRef = {
   onInput: (value: string) => void
   onKeyDown: (e: KeyEvent) => void
   visible: false | "@" | "/"
+  justSelected: boolean
 }
 
 export type AutocompleteOption = {
@@ -90,6 +91,7 @@ export function Autocomplete(props: {
   })
 
   const [positionTick, setPositionTick] = createSignal(0)
+  const [justSelected, setJustSelected] = createSignal(false)
 
   createEffect(() => {
     if (store.visible) {
@@ -371,6 +373,77 @@ export function Autocomplete(props: {
         },
       })
     }
+    if (s) {
+      results.push(
+        {
+          display: "/undo",
+          description: "undo the last message",
+          onSelect: () => {
+            command.trigger("session.undo")
+          },
+        },
+        {
+          display: "/redo",
+          description: "redo the last message",
+          onSelect: () => command.trigger("session.redo"),
+        },
+        {
+          display: "/compact",
+          aliases: ["/summarize"],
+          description: "compact the session",
+          onSelect: () => command.trigger("session.compact"),
+        },
+        {
+          display: "/unshare",
+          disabled: !s.share,
+          description: "unshare a session",
+          onSelect: () => command.trigger("session.unshare"),
+        },
+        {
+          display: "/rename",
+          description: "rename session",
+          onSelect: () => command.trigger("session.rename"),
+        },
+        {
+          display: "/copy",
+          description: "copy session transcript to clipboard",
+          onSelect: () => command.trigger("session.copy"),
+        },
+        {
+          display: "/export",
+          description: "export session transcript to file",
+          onSelect: () => command.trigger("session.export"),
+        },
+        {
+          display: "/timeline",
+          description: "jump to message",
+          onSelect: () => command.trigger("session.timeline"),
+        },
+        {
+          display: "/fork",
+          description: "fork from message",
+          onSelect: () => command.trigger("session.fork"),
+        },
+        {
+          display: "/handoff",
+          description: "handoff to new session with context",
+          onSelect: () => command.trigger("session.handoff"),
+        },
+        {
+          display: "/thinking",
+          description: "toggle thinking visibility",
+          onSelect: () => command.trigger("session.toggle.thinking"),
+        },
+      )
+      if (sync.data.config.share !== "disabled") {
+        results.push({
+          display: "/share",
+          disabled: !!s.share?.url,
+          description: "share a session",
+          onSelect: () => command.trigger("session.share"),
+        })
+      }
+    }
 
     results.sort((a, b) => a.display.localeCompare(b.display))
 
@@ -450,6 +523,9 @@ export function Autocomplete(props: {
   function select() {
     const selected = options()[store.selected]
     if (!selected) return
+    // Set justSelected flag to prevent submit() from firing in the same event loop tick
+    setJustSelected(true)
+    setTimeout(() => setJustSelected(false), 0)
     hide()
     selected.onSelect?.()
   }
@@ -501,6 +577,9 @@ export function Autocomplete(props: {
     props.ref({
       get visible() {
         return store.visible
+      },
+      get justSelected() {
+        return justSelected()
       },
       onInput(value) {
         if (store.visible) {

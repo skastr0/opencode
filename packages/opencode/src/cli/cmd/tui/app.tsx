@@ -691,6 +691,7 @@ function App() {
   })
 
   sdk.event.on(TuiEvent.SessionSelect.type, (evt) => {
+    dialog.clear()
     route.navigate({
       type: "session",
       sessionID: evt.properties.sessionID,

@@ -21,6 +21,7 @@ export function DialogForkFromTimeline(props: { sessionID: string; onMove: (mess
   const options = createMemo((): DialogSelectOption<string>[] => {
     const messages = sync.data.message[props.sessionID] ?? []
     const result = [] as DialogSelectOption<string>[]
+
     for (const message of messages) {
       if (message.role !== "user") continue
       const part = (sync.data.part[message.id] ?? []).find(
@@ -57,6 +58,24 @@ export function DialogForkFromTimeline(props: { sessionID: string; onMove: (mess
       })
     }
     result.reverse()
+
+    // Add "Entire conversation" option at the top (after reverse)
+    result.unshift({
+      title: "Entire conversation",
+      value: "",
+      footer: "Fork all messages",
+      onSelect: async (dialog) => {
+        const forked = await sdk.client.session.fork({
+          sessionID: props.sessionID,
+        })
+        route.navigate({
+          sessionID: forked.data!.id,
+          type: "session",
+        })
+        dialog.clear()
+      },
+    })
+
     return result
   })
 
