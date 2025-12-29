@@ -159,7 +159,7 @@ export namespace LLM {
           : undefined,
         topP: input.agent.topP ?? ProviderTransform.topP(input.model),
         topK: ProviderTransform.topK(input.model),
-        options,
+        options: sanitizeOptions(input.model, options),
       },
     )
 
@@ -363,5 +363,23 @@ export namespace LLM {
 
     // Unknown provider - return empty (no thinking support)
     return {}
+  }
+
+  /**
+   * Sanitize provider options to handle provider-specific quirks.
+   * For example, Gemini doesn't support both thinkingLevel and thinkingBudget together.
+   */
+  function sanitizeOptions(model: Provider.Model, options: Record<string, any>): Record<string, any> {
+    const npm = model.api.npm
+
+    // Google/Gemini: Cannot have both thinkingLevel and thinkingBudget
+    // Prefer thinkingLevel (effort setting) over thinkingBudget
+    if (npm === "@ai-sdk/google" || npm === "@ai-sdk/google-vertex") {
+      if (options.thinkingConfig?.thinkingLevel !== undefined && options.thinkingConfig?.thinkingBudget !== undefined) {
+        delete options.thinkingConfig.thinkingBudget
+      }
+    }
+
+    return options
   }
 }
