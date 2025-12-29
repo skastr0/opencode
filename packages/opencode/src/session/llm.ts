@@ -342,7 +342,7 @@ export namespace LLM {
         return {
           thinkingConfig: {
             includeThoughts: true,
-            thinkingLevel: "HIGH",
+            thinkingLevel: "high",
           },
         }
       }
