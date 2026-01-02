@@ -819,6 +819,10 @@ export type Session = {
   workspaceID?: string
   directory: string
   parentID?: string
+  /**
+   * Nesting depth of session (0 for root, increments for subagent sessions)
+   */
+  depth?: number
   summary?: {
     additions: number
     deletions: number
@@ -1047,6 +1051,17 @@ export type ServerConfig = {
   cors?: Array<string>
 }
 
+export type ThinkingConfig = {
+  /**
+   * Thinking effort level
+   */
+  effort?: "low" | "medium" | "high"
+  /**
+   * Token budget for thinking
+   */
+  budgetTokens?: number
+}
+
 export type PermissionActionConfig = "ask" | "allow" | "deny"
 
 export type PermissionObjectConfig = {
@@ -1119,6 +1134,7 @@ export type AgentConfig = {
    * @deprecated Use 'steps' field instead.
    */
   maxSteps?: number
+  thinking?: ThinkingConfig
   permission?: PermissionConfig
   [key: string]:
     | unknown
@@ -1143,6 +1159,7 @@ export type AgentConfig = {
     | "error"
     | "info"
     | number
+    | ThinkingConfig
     | PermissionConfig
     | undefined
 }
@@ -1510,6 +1527,10 @@ export type Config = {
      * Timeout in milliseconds for model context protocol (MCP) requests
      */
     mcp_timeout?: number
+    /**
+     * Maximum depth of subagent delegation. 0 or undefined means subagents cannot spawn other subagents. Set to 1 to allow one level of nesting, 2 for two levels, etc.
+     */
+    max_delegation_depth?: number
   }
 }
 
@@ -1891,6 +1912,7 @@ export type Agent = {
   topP?: number
   temperature?: number
   color?: string
+  thinking?: ThinkingConfig
   permission: PermissionRuleset
   model?: {
     modelID: string
