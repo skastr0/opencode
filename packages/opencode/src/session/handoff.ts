@@ -177,7 +177,7 @@ export namespace SessionHandoff {
           targetSessionID: newSession.id,
         })
 
-        Bus.publish(TuiEvent.SessionNavigate, {
+        Bus.publish(TuiEvent.SessionSelect, {
           sessionID: newSession.id,
         })
 
