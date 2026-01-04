@@ -1,13 +1,16 @@
 import { createSignal, Show } from "solid-js"
+import { produce } from "solid-js/store"
 import { useTheme } from "@tui/context/theme"
 import { useDialog } from "@tui/ui/dialog"
 import { useSDK } from "../context/sdk"
 import { useLocal } from "../context/local"
 import { useRoute } from "@tui/context/route"
+import { useSync } from "../context/sync"
 import { useToast } from "../ui/toast"
 import { TextareaRenderable, TextAttributes } from "@opentui/core"
 import { useKeyboard } from "@opentui/solid"
 import { onMount } from "solid-js"
+import { Binary } from "@opencode-ai/util/binary"
 
 interface DialogHandoffProps {
   sessionID: string
@@ -18,6 +21,7 @@ export function DialogHandoff(props: DialogHandoffProps) {
   const sdk = useSDK()
   const local = useLocal()
   const route = useRoute()
+  const sync = useSync()
   const toast = useToast()
   const { theme } = useTheme()
   const [isSubmitting, setIsSubmitting] = createSignal(false)
@@ -55,10 +59,21 @@ export function DialogHandoff(props: DialogHandoffProps) {
         providerID: selectedModel.providerID,
       })
       .then((result) => {
-        // Navigate directly to the new session (following Fork pattern)
+        const session = result.data!
+        // Add the new session to the store before navigating
+        const match = Binary.search(sync.data.session, session.id, (s) => s.id)
+        if (!match.found) {
+          sync.set(
+            "session",
+            produce((draft) => {
+              draft.splice(match.index, 0, session)
+            }),
+          )
+        }
+        // Navigate to the new session
         route.navigate({
           type: "session",
-          sessionID: result.data!.id,
+          sessionID: session.id,
         })
         dialog.clear()
       })
