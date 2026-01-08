@@ -259,11 +259,8 @@ export namespace Agent {
 
   export async function list() {
     const cfg = await Config.get()
-    return pipe(
-      await state(),
-      values(),
-      sortBy([(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "build"), "desc"]),
-    )
+    const defaultName = await defaultAgent()
+    return pipe(await state(), values(), sortBy([(x) => x.name === defaultName, "desc"]))
   }
 
   export async function defaultAgent() {
