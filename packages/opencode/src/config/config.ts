@@ -1208,7 +1208,10 @@ export namespace Config {
         .optional(),
       compaction: z
         .object({
-          auto: z.boolean().optional().describe("Enable automatic compaction when context is full (default: true)"),
+          auto: z
+            .boolean()
+            .optional()
+            .describe("Enable automatic compaction when context is full (default: false - use handoff instead)"),
           prune: z.boolean().optional().describe("Enable pruning of old tool outputs (default: true)"),
           reserved: z
             .number()
