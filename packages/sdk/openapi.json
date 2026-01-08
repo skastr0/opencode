@@ -10688,7 +10688,7 @@
             "type": "object",
             "properties": {
               "auto": {
-                "description": "Enable automatic compaction when context is full (default: true)",
+                "description": "Enable automatic compaction when context is full (default: false - use handoff instead)",
                 "type": "boolean"
               },
               "prune": {

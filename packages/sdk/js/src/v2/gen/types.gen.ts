@@ -1493,7 +1493,7 @@ export type Config = {
   }
   compaction?: {
     /**
-     * Enable automatic compaction when context is full (default: true)
+     * Enable automatic compaction when context is full (default: false - use handoff instead)
      */
     auto?: boolean
     /**
