@@ -130,6 +130,11 @@ export namespace SessionCompaction {
     }
 
     const agent = await Agent.get("compaction")
+    // If compaction agent is disabled, skip compaction and continue the loop
+    if (!agent) {
+      log.info("compaction agent disabled, skipping compaction")
+      return "stop" as const
+    }
     const model = agent.model
       ? await Provider.getModel(agent.model.providerID, agent.model.modelID)
       : await Provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
