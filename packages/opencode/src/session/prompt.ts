@@ -963,7 +963,9 @@ export namespace SessionPrompt {
   }
 
   async function createUserMessage(input: PromptInput) {
-    const agent = await Agent.get(input.agent ?? (await Agent.defaultAgent()))
+    // Handle both undefined and empty string cases for agent
+    const agentName = input.agent || (await Agent.defaultAgent())
+    const agent = await Agent.get(agentName)
 
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
     const full =
@@ -971,7 +973,6 @@ export namespace SessionPrompt {
         ? await Provider.getModel(model.providerID, model.modelID).catch(() => undefined)
         : undefined
     const variant = input.variant ?? (agent.variant && full?.variants?.[agent.variant] ? agent.variant : undefined)
-
     const info: MessageV2.Info = {
       id: input.messageID ?? MessageID.ascending(),
       role: "user",
@@ -1530,6 +1531,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       await SessionRevert.cleanup(session)
     }
     const agent = await Agent.get(input.agent)
+    if (!agent) {
+      throw new Error(`Agent not found: ${input.agent}`)
+    }
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
     const userMsg: MessageV2.User = {
       id: MessageID.ascending(),
@@ -1781,7 +1785,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
   export async function command(input: CommandInput) {
     log.info("command", input)
     const command = await Command.get(input.command)
-    const agentName = command.agent ?? input.agent ?? (await Agent.defaultAgent())
+    // Use || to handle both undefined and empty string cases
+    const agentName = command.agent || input.agent || (await Agent.defaultAgent())
 
     const raw = input.arguments.match(argsRegex) ?? []
     const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
