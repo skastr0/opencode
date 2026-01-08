@@ -40,7 +40,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const [agentStore, setAgentStore] = createStore<{
         current: string
       }>({
-        current: agents()[0].name,
+        // Safe initialization: use first agent name or empty string until agents load
+        current: agents()[0]?.name ?? "",
       })
       const { theme } = useTheme()
       const colors = createMemo(() => [
@@ -57,7 +58,18 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           return agents()
         },
         current() {
-          return agents().find((x) => x.name === agentStore.current)!
+          const list = agents()
+          // Handle case where agents haven't loaded yet
+          if (list.length === 0) return undefined
+          // Find current agent, or fall back to first available agent
+          const found = list.find((x) => x.name === agentStore.current)
+          if (found) return found
+          // Fallback: return first agent if current doesn't exist (can happen during load or with stale state)
+          const first = list[0]
+          if (first && agentStore.current !== first.name) {
+            setAgentStore("current", first.name)
+          }
+          return first
         },
         set(name: string) {
           if (!agents().some((x) => x.name === name))
@@ -69,12 +81,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           setAgentStore("current", name)
         },
         move(direction: 1 | -1) {
+          const list = agents()
+          if (list.length === 0) return
           batch(() => {
-            let next = agents().findIndex((x) => x.name === agentStore.current) + direction
-            if (next < 0) next = agents().length - 1
-            if (next >= agents().length) next = 0
-            const value = agents()[next]
-            setAgentStore("current", value.name)
+            let next = list.findIndex((x) => x.name === agentStore.current) + direction
+            if (next < 0) next = list.length - 1
+            if (next >= list.length) next = 0
+            const value = list[next]
+            if (value) setAgentStore("current", value.name)
           })
         },
         color(name: string) {
@@ -192,6 +206,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
       const currentModel = createMemo(() => {
         const a = agent.current()
+        if (!a) return fallbackModel()
         return (
           getFirstValidModel(
             () => modelStore.model[a.name],
@@ -240,7 +255,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           if (next >= recent.length) next = 0
           const val = recent[next]
           if (!val) return
-          setModelStore("model", agent.current().name, { ...val })
+          const currentAgent = agent.current()
+          if (!currentAgent) return
+          setModelStore("model", currentAgent.name, { ...val })
         },
         cycleFavorite(direction: 1 | -1) {
           const favorites = modelStore.favorite.filter((item) => isModelValid(item))
@@ -266,7 +283,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           }
           const next = favorites[index]
           if (!next) return
-          setModelStore("model", agent.current().name, { ...next })
+          const currentAgent = agent.current()
+          if (!currentAgent) return
+          setModelStore("model", currentAgent.name, { ...next })
           const uniq = uniqueBy([next, ...modelStore.recent], (x) => `${x.providerID}/${x.modelID}`)
           if (uniq.length > 10) uniq.pop()
           setModelStore(
@@ -285,7 +304,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               })
               return
             }
-            setModelStore("model", agent.current().name, model)
+            const currentAgent = agent.current()
+            if (!currentAgent) return
+            setModelStore("model", currentAgent.name, model)
             if (options?.recent) {
               const uniq = uniqueBy([model, ...modelStore.recent], (x) => `${x.providerID}/${x.modelID}`)
               if (uniq.length > 10) uniq.pop()
@@ -381,6 +402,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     // Automatically update model when agent changes
     createEffect(() => {
       const value = agent.current()
+      if (!value) return // Agents haven't loaded yet
       if (value.model) {
         if (isModelValid(value.model))
           model.set({

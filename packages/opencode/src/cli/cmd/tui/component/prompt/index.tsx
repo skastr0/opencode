@@ -159,12 +159,17 @@ export function Prompt(props: PromptProps) {
 
       syncedSessionID = sessionID
 
-      // Only set agent if it's a primary agent (not a subagent)
-      const isPrimaryAgent = local.agent.list().some((x) => x.name === msg.agent)
-      if (msg.agent && isPrimaryAgent) {
+      // Set agent from message if it's available in the selectable list (primary/all modes)
+      // If the message's agent is a subagent (not in list), fall back to default agent
+      const availableAgents = local.agent.list()
+      const agentInList = availableAgents.find((x) => x.name === msg.agent)
+      if (agentInList) {
         local.agent.set(msg.agent)
         if (msg.model) local.model.set(msg.model)
         if (msg.variant) local.model.variant.set(msg.variant)
+      } else if (availableAgents.length > 0) {
+        // Message was from a subagent - use the first available agent (default)
+        local.agent.set(availableAgents[0].name)
       }
     }
   })
@@ -541,6 +546,10 @@ export function Prompt(props: PromptProps) {
       promptModelWarning()
       return
     }
+    const currentAgent = local.agent.current()
+    if (!currentAgent) {
+      return
+    }
 
     let sessionID = props.sessionID
     if (sessionID == null) {
@@ -561,7 +570,6 @@ export function Prompt(props: PromptProps) {
 
       sessionID = res.data.id
     }
-
     const messageID = MessageID.ascending()
     let inputText = store.prompt.input
 
@@ -591,7 +599,7 @@ export function Prompt(props: PromptProps) {
     if (store.mode === "shell") {
       sdk.client.session.shell({
         sessionID,
-        agent: local.agent.current().name,
+        agent: currentAgent.name,
         model: {
           providerID: selectedModel.providerID,
           modelID: selectedModel.modelID,
@@ -618,7 +626,7 @@ export function Prompt(props: PromptProps) {
         sessionID,
         command: command.slice(1),
         arguments: args,
-        agent: local.agent.current().name,
+        agent: currentAgent.name,
         model: `${selectedModel.providerID}/${selectedModel.modelID}`,
         messageID,
         variant,
@@ -635,7 +643,7 @@ export function Prompt(props: PromptProps) {
           sessionID,
           ...selectedModel,
           messageID,
-          agent: local.agent.current().name,
+          agent: currentAgent.name,
           model: selectedModel,
           variant,
           parts: [
@@ -756,7 +764,8 @@ export function Prompt(props: PromptProps) {
   const highlight = createMemo(() => {
     if (keybind.leader) return theme.border
     if (store.mode === "shell") return theme.primary
-    return local.agent.color(local.agent.current().name)
+    const agent = local.agent.current()
+    return agent ? local.agent.color(agent.name) : theme.primary
   })
 
   const showVariant = createMemo(() => {
@@ -776,7 +785,8 @@ export function Prompt(props: PromptProps) {
   })
 
   const spinnerDef = createMemo(() => {
-    const color = local.agent.color(local.agent.current().name)
+    const agent = local.agent.current()
+    const color = agent ? local.agent.color(agent.name) : theme.primary
     return {
       frames: createFrames({
         color,
@@ -1015,7 +1025,7 @@ export function Prompt(props: PromptProps) {
             />
             <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1}>
               <text fg={highlight()}>
-                {store.mode === "shell" ? "Shell" : Locale.titlecase(local.agent.current().name)}{" "}
+                {store.mode === "shell" ? "Shell" : Locale.titlecase(local.agent.current()?.name ?? "Agent")}{" "}
               </text>
               <Show when={store.mode === "normal"}>
                 <box flexDirection="row" gap={1}>
