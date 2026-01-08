@@ -1,13 +1,9 @@
-You are creating a handoff summary to transfer context to a new AI session.
+You are creating a brief handoff summary to transfer context to a new AI session.
 
-Your task is to synthesize this conversation into actionable context for continuing the work.
+The full session skeleton and file lists will be included automatically - you do NOT need to repeat them.
 
-Focus on:
-1. What was accomplished - key decisions made, problems solved
-2. Current state - where the work stands right now
-3. Files involved - which files were read or modified and why
-4. Next steps - what should be done next, aligned with any user instructions
+Your task is to provide a BRIEF (2-4 sentences) summary covering:
+1. Current state - what's working and what's not
+2. Immediate next action - what should be done first
 
-Structure your response as briefing context for an AI assistant who will continue this work.
-Be specific about file paths, function names, and technical details.
-Keep the summary concise but comprehensive - aim for 200-400 words.
+Be specific about technical details but keep it concise. The detailed conversation history is preserved in the session file referenced above.

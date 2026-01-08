@@ -13,6 +13,8 @@ import z from "zod"
 import { Agent } from "@/agent/agent"
 import { SessionPrompt } from "./prompt"
 import { LLM } from "./llm"
+import { Global } from "../global"
+import path from "path"
 import PROMPT_HANDOFF from "./prompt/handoff.txt"
 
 export namespace SessionHandoff {
@@ -29,6 +31,79 @@ export namespace SessionHandoff {
         targetSessionID: z.string(),
       }),
     ),
+  }
+
+  /**
+   * Generate a skeleton of the session conversation for context preservation.
+   * Format: numbered list with role, truncated content, and tools used.
+   */
+  function generateSessionSkeleton(msgs: Awaited<ReturnType<typeof Session.messages>>, maxLength = 150): string {
+    const skeleton: string[] = []
+
+    for (let i = 0; i < msgs.length; i++) {
+      const msg = msgs[i]
+      const role = msg.info.role === "user" ? "User" : "Assistant"
+
+      // Extract text content
+      const textParts = msg.parts
+        .filter((p): p is MessageV2.TextPart => p.type === "text")
+        .map((p) => p.text)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+
+      // Extract tool names used
+      const toolNames = msg.parts
+        .filter((p): p is MessageV2.ToolPart => p.type === "tool")
+        .map((p) => p.tool)
+        .filter((v, i, arr) => arr.indexOf(v) === i) // unique
+
+      // Truncate text for skeleton
+      const truncatedText = textParts.length > maxLength ? textParts.slice(0, maxLength) + "..." : textParts
+
+      let entry = `${i + 1}. **${role}**: ${truncatedText || "(no text)"}`
+      if (toolNames.length > 0) {
+        entry += `\n   - Tools: ${toolNames.join(", ")}`
+      }
+
+      skeleton.push(entry)
+    }
+
+    return skeleton.join("\n")
+  }
+
+  /**
+   * Extract list of files that were modified (written/edited) during the session
+   * by scanning tool calls for write/edit operations.
+   */
+  function getModifiedFiles(msgs: Awaited<ReturnType<typeof Session.messages>>): string[] {
+    const modified = new Set<string>()
+    const editTools = ["edit", "write", "morph-mcp_edit_file"]
+
+    for (const msg of msgs) {
+      for (const part of msg.parts) {
+        if (part.type !== "tool") continue
+        if (!editTools.includes(part.tool)) continue
+
+        // Extract file path from tool input (input is inside state)
+        const input = part.state.input as Record<string, unknown>
+        const filePath = (input.filePath || input.path || input.file) as string | undefined
+        if (filePath) {
+          // Normalize path relative to worktree
+          const relativePath = filePath.replace(Instance.worktree + "/", "")
+          modified.add(relativePath)
+        }
+      }
+    }
+
+    return Array.from(modified).sort()
+  }
+
+  /**
+   * Get the file path where the session is stored.
+   */
+  function getSessionFilePath(sessionID: string, projectID: string): string {
+    return path.join(Global.Path.data, "storage", "session", projectID, `${sessionID}.json`)
   }
 
   export const create = fn(
@@ -63,10 +138,17 @@ export namespace SessionHandoff {
         const originalSession = await Session.get(input.sessionID)
 
         const msgs = await Session.messages({ sessionID: input.sessionID })
+
+        // Generate session skeleton and file lists
+        const sessionSkeleton = generateSessionSkeleton(msgs)
+        const modifiedFiles = getModifiedFiles(msgs)
+        const sessionFilePath = getSessionFilePath(input.sessionID, originalSession.projectID)
+
+        // Files read during session
         const filesRead = FileTime.state().read[input.sessionID] ?? {}
-        const filesList = Object.keys(filesRead)
+        const filesReadList = Object.keys(filesRead)
           .map((f) => f.replace(Instance.worktree + "/", ""))
-          .join("\n")
+          .sort()
 
         // Use summary agent for handoff
         const agent = await Agent.get("summary")
@@ -90,11 +172,9 @@ export namespace SessionHandoff {
           input.instruction,
           `</instruction>`,
           ``,
-          filesList
-            ? [`Files that were read during this session:`, `<files_read>`, filesList, `</files_read>`].join("\n")
-            : "",
-          ``,
-          `Please provide a handoff summary.`,
+          `Please provide a BRIEF summary (2-4 sentences) of the current state and next steps.`,
+          `Focus on what's working, what's not, and the immediate next action.`,
+          `Do NOT repeat the session skeleton or file lists - those are already included.`,
         ]
           .filter(Boolean)
           .join("\n")
@@ -125,16 +205,51 @@ export namespace SessionHandoff {
         })
 
         // Collect the full text response
-        let summaryText = ""
+        let llmSummary = ""
         for await (const chunk of stream.fullStream) {
           if (chunk.type === "text-delta") {
-            summaryText += chunk.text
+            llmSummary += chunk.text
           }
         }
 
-        if (!summaryText.trim()) {
-          summaryText = "Handoff from previous session."
+        if (!llmSummary.trim()) {
+          llmSummary = "Continuing work from previous session."
         }
+
+        // Build the comprehensive handoff summary with skeleton and references
+        const summaryText = [
+          `## Continuing from Session: ${input.sessionID}`,
+          ``,
+          `### Source Session`,
+          `- **Session ID**: ${input.sessionID}`,
+          `- **File Path**: ${sessionFilePath}`,
+          `- **Message Count**: ${msgs.length}`,
+          ``,
+          `### Current State`,
+          llmSummary,
+          ``,
+          modifiedFiles.length > 0 ? [`### Files Modified`, ...modifiedFiles.map((f) => `- ${f}`)].join("\n") : "",
+          ``,
+          filesReadList.length > 0
+            ? [
+                `### Files Read`,
+                ...filesReadList.slice(0, 20).map((f) => `- ${f}`),
+                filesReadList.length > 20 ? `- ... and ${filesReadList.length - 20} more` : "",
+              ]
+                .filter(Boolean)
+                .join("\n")
+            : "",
+          ``,
+          `### Conversation Skeleton`,
+          `<details>`,
+          `<summary>Click to expand (${msgs.length} messages)</summary>`,
+          ``,
+          sessionSkeleton,
+          ``,
+          `</details>`,
+        ]
+          .filter(Boolean)
+          .join("\n")
 
         log.info("handoff summary generated", { length: summaryText.length })
 
