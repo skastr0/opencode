@@ -119,7 +119,7 @@ export namespace Project {
           }
         }
 
-        const worktree = await git(["rev-parse", "--git-common-dir"], {
+        const commonRoot = await git(["rev-parse", "--git-common-dir"], {
           cwd: sandbox,
         })
           .then(async (result) => {
@@ -129,7 +129,7 @@ export namespace Project {
           })
           .catch(() => undefined)
 
-        if (!worktree) {
+        if (!commonRoot) {
           return {
             id: id ?? ProjectID.global,
             worktree: sandbox,
@@ -142,7 +142,7 @@ export namespace Project {
         // because `.git` is not a folder, but it always needs the
         // same project id as the common dir, so we resolve it now
         if (id == null) {
-          id = await readCachedId(path.join(worktree, ".git"))
+          id = await readCachedId(path.join(commonRoot, ".git"))
         }
 
         // generate id from root commit
@@ -171,7 +171,7 @@ export namespace Project {
           id = roots[0] ? ProjectID.make(roots[0]) : undefined
           if (id) {
             // Write to common dir so the cache is shared across worktrees.
-            await Filesystem.write(path.join(worktree, ".git", "opencode"), id).catch(() => undefined)
+            await Filesystem.write(path.join(commonRoot, ".git", "opencode"), id).catch(() => undefined)
           }
         }
 
@@ -200,11 +200,10 @@ export namespace Project {
         }
 
         sandbox = top
-
         return {
           id,
           sandbox,
-          worktree,
+          worktree: sandbox,
           vcs: "git",
         }
       }
@@ -233,6 +232,13 @@ export namespace Project {
 
     if (Flag.OPENCODE_EXPERIMENTAL_ICON_DISCOVERY) discover(existing)
 
+    // Track previous worktree in sandboxes if it's different from the current one
+    // This allows tracking all accessed worktrees for the same git repository
+    const previousWorktree = existing.worktree
+    if (previousWorktree && previousWorktree !== data.worktree && !existing.sandboxes.includes(previousWorktree)) {
+      existing.sandboxes.push(previousWorktree)
+    }
+
     const result: Info = {
       ...existing,
       worktree: data.worktree,
@@ -242,9 +248,7 @@ export namespace Project {
         updated: Date.now(),
       },
     }
-    if (data.sandbox !== result.worktree && !result.sandboxes.includes(data.sandbox))
-      result.sandboxes.push(data.sandbox)
-    result.sandboxes = result.sandboxes.filter((x) => existsSync(x))
+    result.sandboxes = result.sandboxes.filter((x) => existsSync(x) && x !== data.worktree)
     const insert = {
       id: result.id,
       worktree: result.worktree,

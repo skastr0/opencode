@@ -139,7 +139,7 @@ describe("Project.fromDirectory", () => {
 })
 
 describe("Project.fromDirectory with worktrees", () => {
-  test("should set worktree to root when called from root", async () => {
+  test("should set worktree to the working directory when called from root", async () => {
     const p = await loadProject()
     await using tmp = await tmpdir({ git: true })
 
@@ -150,7 +150,7 @@ describe("Project.fromDirectory with worktrees", () => {
     expect(project.sandboxes).not.toContain(tmp.path)
   })
 
-  test("should set worktree to root when called from a worktree", async () => {
+  test("should set worktree to the actual worktree path when called from a git worktree", async () => {
     const p = await loadProject()
     await using tmp = await tmpdir({ git: true })
 
@@ -160,10 +160,9 @@ describe("Project.fromDirectory with worktrees", () => {
 
       const { project, sandbox } = await p.fromDirectory(worktreePath)
 
-      expect(project.worktree).toBe(tmp.path)
+      expect(project.worktree).toBe(worktreePath)
       expect(sandbox).toBe(worktreePath)
-      expect(project.sandboxes).toContain(worktreePath)
-      expect(project.sandboxes).not.toContain(tmp.path)
+      expect(project.sandboxes).not.toContain(worktreePath)
     } finally {
       await $`git worktree remove ${worktreePath}`
         .cwd(tmp.path)
@@ -218,7 +217,7 @@ describe("Project.fromDirectory with worktrees", () => {
     }
   })
 
-  test("should accumulate multiple worktrees in sandboxes", async () => {
+  test("should share project ID across worktrees but track each worktree path", async () => {
     const p = await loadProject()
     await using tmp = await tmpdir({ git: true })
 
@@ -228,13 +227,18 @@ describe("Project.fromDirectory with worktrees", () => {
       await $`git worktree add ${worktree1} -b branch-${Date.now()}`.cwd(tmp.path).quiet()
       await $`git worktree add ${worktree2} -b branch-${Date.now() + 1}`.cwd(tmp.path).quiet()
 
-      await p.fromDirectory(worktree1)
-      const { project } = await p.fromDirectory(worktree2)
+      const { project: mainProject } = await p.fromDirectory(tmp.path)
+      const { project: wt1Project } = await p.fromDirectory(worktree1)
+      const { project: wt2Project } = await p.fromDirectory(worktree2)
 
-      expect(project.worktree).toBe(tmp.path)
-      expect(project.sandboxes).toContain(worktree1)
-      expect(project.sandboxes).toContain(worktree2)
-      expect(project.sandboxes).not.toContain(tmp.path)
+      expect(mainProject.id).toBe(wt1Project.id)
+      expect(mainProject.id).toBe(wt2Project.id)
+      expect(mainProject.worktree).toBe(tmp.path)
+      expect(wt1Project.worktree).toBe(worktree1)
+      expect(wt2Project.worktree).toBe(worktree2)
+      expect(wt2Project.sandboxes).toContain(tmp.path)
+      expect(wt2Project.sandboxes).toContain(worktree1)
+      expect(wt2Project.sandboxes).not.toContain(worktree2)
     } finally {
       await $`git worktree remove ${worktree1}`
         .cwd(tmp.path)
