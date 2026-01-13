@@ -1,10 +1,11 @@
+import path from "path"
 import { fn } from "@/util/fn"
 import z from "zod"
 import { Session } from "."
 
 import { MessageV2 } from "./message-v2"
-import { Identifier } from "@/id/id"
 import { SessionID, MessageID } from "./schema"
+import { Instance } from "@/project/instance"
 import { Snapshot } from "@/snapshot"
 
 import { Storage } from "@/storage/storage"
@@ -82,7 +83,18 @@ export namespace SessionSummary {
   )
 
   async function summarizeSession(input: { sessionID: SessionID; messages: MessageV2.WithParts[] }) {
-    const diffs = await computeDiff({ messages: input.messages })
+    const session = await Session.get(input.sessionID).catch(() => undefined)
+    const sessionDirectory = session?.directory ?? Instance.worktree
+    const files = new Set(
+      input.messages
+        .flatMap((x) => x.parts)
+        .filter((x) => x.type === "patch")
+        .flatMap((x) => x.files)
+        .map((x) => path.relative(sessionDirectory, x).replaceAll("\\", "/")),
+    )
+    const diffs = await computeDiff({ messages: input.messages }).then((x) =>
+      files.size === 0 ? x : x.filter((item) => files.has(item.file)),
+    )
     await Session.setSummary({
       sessionID: input.sessionID,
       summary: {
