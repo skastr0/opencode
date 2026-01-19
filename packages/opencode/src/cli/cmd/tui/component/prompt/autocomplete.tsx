@@ -355,8 +355,11 @@ export function Autocomplete(props: {
       )
   })
 
+  const session = createMemo(() => (props.sessionID ? sync.session.get(props.sessionID) : undefined))
+
   const commands = createMemo((): AutocompleteOption[] => {
     const results: AutocompleteOption[] = [...command.slashes()]
+    const s = session()
 
     for (const serverCommand of sync.data.command) {
       if (serverCommand.source === "skill") continue
