@@ -102,6 +102,7 @@ describe("session.llm.hasToolCalls", () => {
   })
 })
 
+<<<<<<< HEAD
 type Capture = {
   url: URL
   headers: Headers
@@ -754,6 +755,73 @@ describe("session.llm.stream", () => {
         expect(config?.topP).toBe(0.8)
         expect(config?.maxOutputTokens).toBe(ProviderTransform.maxOutputTokens(resolved))
       },
+    })
+  })
+})
+
+describe("session.llm.buildRequestLog", () => {
+  test("builds a sanitized payload", () => {
+    const payload = LLM.buildRequestLog({
+      providerID: "anthropic",
+      modelID: "claude-3-opus",
+      sessionID: "session-123",
+      agent: "builder",
+      variantKey: null,
+      maxOutputTokens: 1200,
+      thinking: { effort: "low", budgetTokens: 400 },
+      messageCount: 2,
+      systemCount: 1,
+      toolCount: 3,
+      activeToolCount: 2,
+    })
+
+    expect(payload).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-3-opus",
+      sessionID: "session-123",
+      agent: "builder",
+      variant: { key: null },
+      maxOutputTokens: 1200,
+      thinking: { effort: "low", budgetTokens: 400 },
+      messages: { total: 3, system: 1, history: 2 },
+      tools: { total: 3, active: 2 },
+    })
+  })
+})
+
+describe("session.llm.mergeOptions", () => {
+  test("variants override base, model, and agent options", () => {
+    const options = LLM.mergeOptions({
+      base: {
+        thinking: {
+          type: "enabled",
+          budgetTokens: 4000,
+        },
+        reasoningEffort: "low",
+      },
+      model: {
+        thinking: {
+          budgetTokens: 8000,
+        },
+        reasoningEffort: "medium",
+      },
+      agent: {
+        reasoningEffort: "high",
+      },
+      variant: {
+        thinking: {
+          budgetTokens: 12000,
+        },
+        reasoningEffort: "low",
+      },
+    })
+
+    expect(options).toEqual({
+      thinking: {
+        type: "enabled",
+        budgetTokens: 12000,
+      },
+      reasoningEffort: "low",
     })
   })
 })

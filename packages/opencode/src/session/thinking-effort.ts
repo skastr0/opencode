@@ -4,24 +4,29 @@ export namespace ThinkingEffort {
     budgetTokens: number
   }
 
-  export function detect(text: string): Level | undefined {
-    const lower = text.toLowerCase().trim()
+  export type Input = {
+    effort?: Level["effort"]
+    budgetTokens?: number
+  }
 
-    // Check ultrathink first (most specific)
-    if (lower.includes("ultrathink") || lower.includes("think really hard")) {
-      return { effort: "high", budgetTokens: 128_000 }
-    }
+  // Safe cross-provider budget defaults:
+  // - Anthropic max: 32,000 (docs.anthropic.com/en/build-with-claude/extended-thinking)
+  // - Google Flash max: 24,576, Pro max: 32,768 (ai.google.dev/gemini-api/docs/thinking)
+  // buildThinkingOptions() clamps to provider-specific limits
+  export const BUDGET_HIGH = 16_000
+  export const BUDGET_MEDIUM = 10_000
+  export const BUDGET_LOW = 4_000
 
-    // Check think hard
-    if (lower.includes("think hard") || lower.includes("think harder")) {
-      return { effort: "high", budgetTokens: 32_000 }
-    }
+  export function budgetFor(effort: Level["effort"]): number {
+    if (effort === "high") return BUDGET_HIGH
+    if (effort === "low") return BUDGET_LOW
+    return BUDGET_MEDIUM
+  }
 
-    // Check basic think (only at start)
-    if (lower.startsWith("think")) {
-      return { effort: "medium", budgetTokens: 10_000 }
-    }
-
-    return undefined
+  export function resolve(input?: Input): Level | undefined {
+    if (!input) return undefined
+    const effort = input.effort ?? "medium"
+    const budgetTokens = input.budgetTokens ?? budgetFor(effort)
+    return { effort, budgetTokens }
   }
 }

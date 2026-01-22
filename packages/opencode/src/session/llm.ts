@@ -96,30 +96,13 @@ export namespace LLM {
 
     const variant =
       !input.small && input.model.variants && input.user.variant ? input.model.variants[input.user.variant] : {}
+    const variantKey =
+      !input.small && input.model.variants && input.user.variant && input.model.variants[input.user.variant]
+        ? input.user.variant
+        : null
 
-    // Determine thinking config: agent config takes precedence over pattern detection
-    const agentThinking = input.agent.thinking
-    let thinkingLevel: ThinkingEffort.Level | undefined
-
-    if (agentThinking) {
-      // Agent-level thinking config overrides pattern detection
-      thinkingLevel = {
-        effort: agentThinking.effort ?? "medium",
-        budgetTokens: agentThinking.budgetTokens ?? 10_000,
-      }
-    } else {
-      // Fall back to pattern detection from user text
-      const lastUserMsg = input.messages.findLast((m) => m.role === "user")
-      const userText = lastUserMsg
-        ? typeof lastUserMsg.content === "string"
-          ? lastUserMsg.content
-          : lastUserMsg.content
-              .filter((p): p is { type: "text"; text: string } => p.type === "text")
-              .map((p) => p.text)
-              .join(" ")
-        : ""
-      thinkingLevel = ThinkingEffort.detect(userText)
-    }
+    // Build thinking options from agent config (if present)
+    const thinkingLevel = ThinkingEffort.resolve(input.agent.thinking)
 
     // Build provider-specific thinking options
     const thinkingOptions = thinkingLevel ? buildThinkingOptions(input.model, thinkingLevel) : {}
@@ -134,12 +117,12 @@ export namespace LLM {
       ...(input.small ? ProviderTransform.smallOptions(input.model) : {}),
       ...thinkingOptions,
     }
-    const options: Record<string, any> = pipe(
-      baseOptions,
-      mergeDeep(input.model.options),
-      mergeDeep(input.agent.options),
-      mergeDeep(variant),
-    )
+    const options: Record<string, any> = mergeOptions({
+      base: baseOptions,
+      model: input.model.options,
+      agent: input.agent.options,
+      variant,
+    })
     if (isCodex) {
       options.instructions = SystemPrompt.instructions()
     }
@@ -204,6 +187,23 @@ export namespace LLM {
       })
     }
 
+    const toolKeys = Object.keys(tools)
+    const activeTools = toolKeys.filter((x) => x !== "invalid" && x !== "_noop")
+    const requestLog = buildRequestLog({
+      providerID: input.model.providerID,
+      modelID: input.model.id,
+      sessionID: input.sessionID,
+      agent: input.agent.name,
+      variantKey,
+      maxOutputTokens,
+      thinking: thinkingLevel,
+      messageCount: input.messages.length,
+      systemCount: system.length,
+      toolCount: toolKeys.length,
+      activeToolCount: activeTools.length,
+    })
+    l.debug("stream request", requestLog)
+
     return streamText({
       onError(error) {
         l.error("stream error", {
@@ -235,7 +235,7 @@ export namespace LLM {
       topP: params.topP,
       topK: params.topK,
       providerOptions: ProviderTransform.providerOptions(input.model, params.options),
-      activeTools: Object.keys(tools).filter((x) => x !== "invalid"),
+      activeTools,
       tools,
       toolChoice: input.toolChoice,
       maxOutputTokens,
@@ -315,14 +315,103 @@ export namespace LLM {
     return false
   }
 
+  export type RequestLog = {
+    providerID: string
+    modelID: string
+    sessionID: string
+    agent: string
+    variant: {
+      key: string | null
+    }
+    maxOutputTokens?: number
+    thinking: {
+      effort: ThinkingEffort.Level["effort"] | null
+      budgetTokens: number | null
+    }
+    messages: {
+      total: number
+      system: number
+      history: number
+    }
+    tools: {
+      total: number
+      active: number
+    }
+  }
+
+  export function buildRequestLog(input: {
+    providerID: string
+    modelID: string
+    sessionID: string
+    agent: string
+    variantKey: string | null
+    maxOutputTokens?: number
+    thinking?: ThinkingEffort.Level
+    messageCount: number
+    systemCount: number
+    toolCount: number
+    activeToolCount: number
+  }): RequestLog {
+    return {
+      providerID: input.providerID,
+      modelID: input.modelID,
+      sessionID: input.sessionID,
+      agent: input.agent,
+      variant: {
+        key: input.variantKey,
+      },
+      maxOutputTokens: input.maxOutputTokens,
+      thinking: {
+        effort: input.thinking?.effort ?? null,
+        budgetTokens: input.thinking?.budgetTokens ?? null,
+      },
+      messages: {
+        total: input.messageCount + input.systemCount,
+        system: input.systemCount,
+        history: input.messageCount,
+      },
+      tools: {
+        total: input.toolCount,
+        active: input.activeToolCount,
+      },
+    }
+  }
+
+  export function mergeOptions(input: {
+    base: Record<string, unknown>
+    model?: Record<string, unknown>
+    agent?: Record<string, unknown>
+    variant?: Record<string, unknown>
+  }): Record<string, unknown> {
+    const model = input.model ?? {}
+    const agent = input.agent ?? {}
+    const variant = input.variant ?? {}
+    return pipe(input.base, mergeDeep(model), mergeDeep(agent), mergeDeep(variant))
+  }
+
   function buildThinkingOptions(model: Provider.Model, level: ThinkingEffort.Level): Record<string, any> {
     const npm = model.api.npm
 
+    // Provider-specific budget limits (from official API docs)
+    // Anthropic: 32,000 max (docs.anthropic.com/en/build-with-claude/extended-thinking)
+    // Google Flash: 24,576 max, Pro: 32,768 max (ai.google.dev/gemini-api/docs/thinking)
+    const ANTHROPIC_MAX = 32_000
+    const GOOGLE_FLASH_MAX = 24_576
+
     // Anthropic: thinking.type + budgetTokens + effort
     if (npm === "@ai-sdk/anthropic") {
+      const budget = Math.min(level.budgetTokens, ANTHROPIC_MAX)
       return {
-        thinking: { type: "enabled" as const, budgetTokens: level.budgetTokens },
+        thinking: { type: "enabled" as const, budgetTokens: budget },
         effort: level.effort,
+      }
+    }
+
+    // Bedrock with Anthropic models: reasoningConfig
+    if (npm === "@ai-sdk/amazon-bedrock" && model.api.id.includes("anthropic")) {
+      const budget = Math.min(level.budgetTokens, ANTHROPIC_MAX)
+      return {
+        reasoningConfig: { type: "enabled" as const, budgetTokens: budget },
       }
     }
 
@@ -346,10 +435,11 @@ export namespace LLM {
           },
         }
       }
+      const budget = Math.min(level.budgetTokens, GOOGLE_FLASH_MAX)
       return {
         thinkingConfig: {
           includeThoughts: true,
-          thinkingBudget: level.budgetTokens,
+          thinkingBudget: budget,
         },
       }
     }
