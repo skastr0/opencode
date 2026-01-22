@@ -190,7 +190,7 @@ export namespace SessionHandoff {
           tools: {},
           system: [],
           messages: [
-            ...MessageV2.toModelMessage(msgs),
+            ...MessageV2.toModelMessages(msgs, model),
             {
               role: "user",
               content: [
