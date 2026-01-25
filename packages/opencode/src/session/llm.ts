@@ -451,6 +451,13 @@ export namespace LLM {
       }
     }
 
+    // OpenAI-compatible providers (including opencode proxy): reasoningEffort
+    if (npm === "@ai-sdk/openai-compatible") {
+      return {
+        reasoningEffort: level.effort,
+      }
+    }
+
     // Unknown provider - return empty (no thinking support)
     return {}
   }

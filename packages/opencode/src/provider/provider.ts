@@ -151,7 +151,7 @@ export namespace Provider {
         options: {
           headers: {
             "anthropic-beta":
-              "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14,effort-2025-11-24",
+              "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaminging-2025-05-14,effort-2025-11-24",
           },
         },
       }
@@ -754,8 +754,15 @@ export namespace Provider {
       family: model.family,
       api: {
         id: model.id,
-        url: model.provider?.api ?? provider.api!,
-        npm: model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible",
+        url: provider.api!,
+        npm: iife(() => {
+          if (provider.id.startsWith("github-copilot")) return "@ai-sdk/github-copilot"
+          // For opencode provider, always use the provider's npm (openai-compatible) since
+          // the opencode API speaks OpenAI protocol regardless of the underlying model.
+          // The model.provider.npm is only used for direct provider access.
+          if (provider.id.startsWith("opencode")) return provider.npm ?? "@ai-sdk/openai-compatible"
+          return model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible"
+        }),
       },
       status: model.status ?? "active",
       headers: model.headers ?? {},
