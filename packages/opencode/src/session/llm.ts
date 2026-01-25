@@ -422,6 +422,15 @@ export namespace LLM {
       }
     }
 
+    // GitHub Copilot: reasoningEffort with summary
+    if (npm === "@ai-sdk/github-copilot") {
+      return {
+        reasoningEffort: level.effort,
+        reasoningSummary: "auto",
+        include: ["reasoning.encrypted_content"],
+      }
+    }
+
     // Google: thinkingConfig with budget or level
     // Note: Google API treats "high" specially with thinkingLevel, while lower
     // efforts use explicit token budgets via thinkingBudget
