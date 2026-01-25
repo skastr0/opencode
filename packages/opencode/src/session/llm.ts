@@ -398,12 +398,12 @@ export namespace LLM {
     const ANTHROPIC_MAX = 32_000
     const GOOGLE_FLASH_MAX = 24_576
 
-    // Anthropic: thinking.type + budgetTokens + effort
+    // Anthropic: thinking.type + budgetTokens
+    // Note: effort requires beta header which proxied providers (like opencode) may not support
     if (npm === "@ai-sdk/anthropic") {
       const budget = Math.min(level.budgetTokens, ANTHROPIC_MAX)
       return {
         thinking: { type: "enabled" as const, budgetTokens: budget },
-        effort: level.effort,
       }
     }
 

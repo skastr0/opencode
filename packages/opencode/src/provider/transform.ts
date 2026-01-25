@@ -914,10 +914,11 @@ export namespace ProviderTransform {
       const budgetTokens = typeof thinking?.["budgetTokens"] === "number" ? thinking["budgetTokens"] : 0
       const enabled = thinking?.["type"] === "enabled"
       if (enabled && budgetTokens > 0) {
-        // When thinking is enabled, we need to request enough max_tokens to cover
-        // both the thinking budget AND the desired text output.
-        // We trust the budget implies the model supports higher limits than our default modelCap.
-        return budgetTokens + standardLimit
+        // Return text tokens so that text + thinking <= model cap, preferring 32k text when possible.
+        if (budgetTokens + standardLimit <= modelCap) {
+          return standardLimit
+        }
+        return modelCap - budgetTokens
       }
     }
 
