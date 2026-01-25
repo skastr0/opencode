@@ -757,10 +757,6 @@ export namespace Provider {
         url: provider.api!,
         npm: iife(() => {
           if (provider.id.startsWith("github-copilot")) return "@ai-sdk/github-copilot"
-          // For opencode provider, always use the provider's npm (openai-compatible) since
-          // the opencode API speaks OpenAI protocol regardless of the underlying model.
-          // The model.provider.npm is only used for direct provider access.
-          if (provider.id.startsWith("opencode")) return provider.npm ?? "@ai-sdk/openai-compatible"
           return model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible"
         }),
       },
