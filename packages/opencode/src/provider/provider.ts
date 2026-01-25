@@ -1123,6 +1123,21 @@ export namespace Provider {
 
       if (baseURL !== undefined) options["baseURL"] = baseURL
       if (options["apiKey"] === undefined && provider.key) options["apiKey"] = provider.key
+
+      // For Anthropic SDK models on non-anthropic providers (e.g. opencode proxy),
+      // add the anthropic-beta header required for extended thinking
+      if (
+        model.api.npm === "@ai-sdk/anthropic" &&
+        model.providerID !== "anthropic" &&
+        !options["headers"]?.["anthropic-beta"]
+      ) {
+        options["headers"] = {
+          ...options["headers"],
+          "anthropic-beta":
+            "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14,effort-2025-11-24",
+        }
+      }
+
       if (model.headers)
         options["headers"] = {
           ...options["headers"],
