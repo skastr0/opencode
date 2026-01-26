@@ -69,8 +69,10 @@ export namespace LLM {
       modelID: input.model.id,
       providerID: input.model.providerID,
     })
+    const isNativeProvider = input.model.providerID === "claude-agent-sdk"
     const [language, cfg, provider, auth] = await Promise.all([
-      Provider.getLanguage(input.model),
+      // Native providers (claude-agent-sdk) don't use AI SDK language models
+      isNativeProvider ? Promise.resolve(null) : Provider.getLanguage(input.model),
       Config.get(),
       Provider.getProvider(input.model.providerID),
       Auth.get(input.model.providerID),
@@ -245,7 +247,30 @@ export namespace LLM {
       const sessionKey = input.sessionID
       const sdkSessionId = await claudeSessionStore.get(sessionKey, input.model.id)
       if (sdkSessionId) await claudeSessionStore.touch(sessionKey)
-      const prompt = ProviderTransform.message(messages, input.model, options) as LanguageModelV2Prompt
+
+      // When resuming an SDK session, only send the new user message + any per-request system overrides.
+      // The SDK session already has the full system prompt and history.
+      let promptMessages: ModelMessage[]
+      if (sdkSessionId) {
+        // Find the last user message (scan backwards to be safe)
+        const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")
+        // Include any per-request system overrides (from input.user.system or input.system)
+        const perRequestSystem = [...input.system, input.user.system].filter(Boolean).join("\n")
+        promptMessages = [
+          ...(perRequestSystem ? [{ role: "system", content: perRequestSystem } as ModelMessage] : []),
+          ...(lastUserMessage ? [lastUserMessage] : []),
+        ]
+        l.debug("resuming SDK session with minimal prompt", {
+          sdkSessionId,
+          hasPerRequestSystem: Boolean(perRequestSystem),
+          hasUserMessage: Boolean(lastUserMessage),
+        })
+      } else {
+        // First request in session: send full system prompt + history
+        promptMessages = messages
+      }
+
+      const prompt = ProviderTransform.message(promptMessages, input.model, options) as LanguageModelV2Prompt
 
       const nativeStream =
         (globalThis as { __opencodeStreamClaudeNative?: typeof streamClaudeNative }).__opencodeStreamClaudeNative ??
@@ -349,7 +374,7 @@ export namespace LLM {
       maxRetries: input.retries ?? 0,
       messages,
       model: wrapLanguageModel({
-        model: language,
+        model: language!,
         middleware: [
           {
             async transformParams(args) {
