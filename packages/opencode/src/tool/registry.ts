@@ -98,7 +98,6 @@ export namespace ToolRegistry {
 
   async function all(): Promise<Tool.Info[]> {
     const custom = await state().then((x) => x.custom)
-    const config = await Config.get()
     const question = ["app", "cli", "desktop"].includes(Flag.OPENCODE_CLIENT) || Flag.OPENCODE_ENABLE_QUESTION_TOOL
 
     return [
@@ -119,7 +118,7 @@ export namespace ToolRegistry {
       SkillTool,
       ApplyPatchTool,
       ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [LspTool] : []),
-      ...(config.experimental?.batch_tool === true ? [BatchTool] : []),
+      BatchTool, // Enable batch tool by default for parallel tool execution
       ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [PlanExitTool] : []),
       ...custom,
     ]

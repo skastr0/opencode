@@ -16,6 +16,7 @@ Good Use Cases:
 - grep + glob + read combos
 - Multiple bash commands
 - Multi-part edits; on the same, or different files
+- Parallel subagent dispatch (multiple task tools) - Note: doesn't work in Claude Code due to API concurrency limits
 
 When NOT to Use:
 - Operations that depend on prior tool output (e.g. create then read same file)
