@@ -2107,11 +2107,33 @@ function Edit(props: ToolProps<typeof EditTool>) {
 
   const ft = createMemo(() => filetype(props.input.filePath))
 
-  const diffContent = createMemo(() => props.metadata.diff)
+  // Use metadata.diff if available, otherwise generate from input oldString/newString
+  // (SDK native Edit calls don't have metadata.diff, but do have the input strings)
+  const diffContent = createMemo(() => {
+    if (props.metadata.diff) return props.metadata.diff
+    // Generate unified diff from oldString/newString for SDK native tools
+    const oldStr = props.input.oldString
+    const newStr = props.input.newString
+    if (oldStr !== undefined && newStr !== undefined) {
+      // Create a simple unified diff format
+      const oldLines = oldStr.split("\n")
+      const newLines = newStr.split("\n")
+      const hunks: string[] = []
+      hunks.push(`@@ -1,${oldLines.length} +1,${newLines.length} @@`)
+      for (const line of oldLines) {
+        hunks.push(`-${line}`)
+      }
+      for (const line of newLines) {
+        hunks.push(`+${line}`)
+      }
+      return hunks.join("\n")
+    }
+    return undefined
+  })
 
   return (
     <Switch>
-      <Match when={props.metadata.diff !== undefined}>
+      <Match when={diffContent() !== undefined}>
         <BlockTool title={"← Edit " + normalizePath(props.input.filePath!)} part={props.part}>
           <box paddingLeft={1}>
             <diff
