@@ -43,7 +43,7 @@ const queryFactory = (prompt: string, options: unknown) => {
 
 import type { ClaudeNativeStreamEvent } from "../../../src/provider/native/claude-agent-sdk"
 const setupMocks = () => {
-  mock.module("../../../src/provider/sdk/claude-agent-sdk/tool-bridge", () => ({
+  mock.module("../../../src/provider/native/tool-bridge", () => ({
     createOpenCodeToolsServer: async (input: unknown) => {
       state.toolInput = input
       return { type: "sdk", name: "opencode", instance: {} }

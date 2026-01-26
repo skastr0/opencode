@@ -4,8 +4,8 @@ import type {
   LanguageModelV2Usage,
   SharedV2ProviderMetadata,
 } from "@ai-sdk/provider"
-import { createOpenCodeToolsServer, DISABLED_SDK_TOOLS } from "../sdk/claude-agent-sdk/tool-bridge"
-import { mapModelId } from "../sdk/claude-agent-sdk/models"
+import { createOpenCodeToolsServer, DISABLED_SDK_TOOLS } from "./tool-bridge"
+import { mapModelId } from "./models"
 import type { Provider } from "../provider"
 
 type SDKMessage = Record<string, unknown>

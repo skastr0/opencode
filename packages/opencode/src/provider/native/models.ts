@@ -1,4 +1,4 @@
-import type { Provider } from "../../provider"
+import type { Provider } from "../provider"
 
 export const CLAUDE_AGENT_SDK_MODELS: Record<string, Provider.Model> = {
   "claude-opus-4-5": {

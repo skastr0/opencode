@@ -1,5 +1,5 @@
-import { Storage } from "../../../storage/storage"
-import { Log } from "../../../util/log"
+import { Storage } from "../../storage/storage"
+import { Log } from "../../util/log"
 
 interface SDKSession {
   sdkSessionId: string

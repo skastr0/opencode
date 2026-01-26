@@ -30,7 +30,7 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { createOpenRouter, type LanguageModelV2 } from "@openrouter/ai-sdk-provider"
 import { createOpenaiCompatible as createGitHubCopilotOpenAICompatible } from "./sdk/copilot"
-import { createClaudeAgentSDK, CLAUDE_AGENT_SDK_MODELS } from "./sdk/claude-agent-sdk"
+import { CLAUDE_AGENT_SDK_MODELS } from "./native/models"
 import { createXai } from "@ai-sdk/xai"
 import { createMistral } from "@ai-sdk/mistral"
 import { createGroq } from "@ai-sdk/groq"
@@ -108,7 +108,6 @@ export namespace Provider {
   }
 
   const BUNDLED_PROVIDERS: Record<string, (options: any) => SDK> = {
-    "@anthropic-ai/claude-agent-sdk": createClaudeAgentSDK,
     "@ai-sdk/amazon-bedrock": createAmazonBedrock,
     "@ai-sdk/anthropic": createAnthropic,
     "@ai-sdk/azure": createAzure,
@@ -211,12 +210,10 @@ export namespace Provider {
     },
     "claude-agent-sdk": async () => {
       // Always autoload - SDK handles its own auth (CLI login, OAuth, API key, etc.)
+      // Note: No getModel needed since we use native streaming (streamClaudeNative) instead of AI SDK
       return {
         autoload: true,
         options: {},
-        async getModel(sdk: any, modelID: string) {
-          return sdk.languageModel(modelID)
-        },
       }
     },
     azure: async (provider) => {

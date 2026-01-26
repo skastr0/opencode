@@ -26,7 +26,7 @@ import { Auth } from "@/auth"
 import { ThinkingEffort } from "./thinking-effort"
 import type { ClaudeNativeStreamEvent } from "@/provider/native/claude-agent-sdk"
 import { streamClaudeNative } from "@/provider/native/claude-agent-sdk"
-import { ClaudeAgentSDKSessionStore } from "@/provider/sdk/claude-agent-sdk/session-store"
+import { ClaudeAgentSDKSessionStore } from "@/provider/native/session-store"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
