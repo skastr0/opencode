@@ -109,22 +109,42 @@ export namespace SessionProcessor {
                   }
                   break
 
-                case "tool-input-start":
-                  const part = await Session.updatePart({
-                    id: toolcalls[value.id]?.id ?? PartID.ascending(),
-                    messageID: input.assistantMessage.id,
-                    sessionID: input.assistantMessage.sessionID,
-                    type: "tool",
-                    tool: value.toolName,
-                    callID: value.id,
-                    state: {
-                      status: "pending",
-                      input: {},
-                      raw: "",
-                    },
-                  })
-                  toolcalls[value.id] = part as MessageV2.ToolPart
+                case "tool-input-start": {
+                  // Check if part already exists by callID (e.g., pre-created by tool-bridge for native SDK)
+                  const cachedPart = toolcalls[value.id]
+                  if (cachedPart) {
+                    // Already tracked, nothing to do
+                    break
+                  }
+
+                  // Check storage for existing part (may have been pre-created by tool-bridge)
+                  const storedParts = await MessageV2.parts(input.assistantMessage.id)
+                  const foundPart = storedParts.find(
+                    (p): p is MessageV2.ToolPart => p.type === "tool" && p.callID === value.id,
+                  )
+
+                  if (foundPart) {
+                    // Part already exists (pre-created by tool-bridge), just register it
+                    toolcalls[value.id] = foundPart
+                  } else {
+                    // Create new part with pending state
+                    const part = await Session.updatePart({
+                      id: PartID.ascending(),
+                      messageID: input.assistantMessage.id,
+                      sessionID: input.assistantMessage.sessionID,
+                      type: "tool",
+                      tool: value.toolName,
+                      callID: value.id,
+                      state: {
+                        status: "pending",
+                        input: {},
+                        raw: "",
+                      },
+                    })
+                    toolcalls[value.id] = part as MessageV2.ToolPart
+                  }
                   break
+                }
 
                 case "tool-input-delta":
                   break
@@ -181,21 +201,31 @@ export namespace SessionProcessor {
                 case "tool-result": {
                   const match = toolcalls[value.toolCallId]
                   if (match && match.state.status === "running") {
-                    await Session.updatePart({
-                      ...match,
-                      state: {
-                        status: "completed",
-                        input: value.input ?? match.state.input,
-                        output: value.output.output,
-                        metadata: value.output.metadata,
-                        title: value.output.title,
-                        time: {
-                          start: match.state.time.start,
-                          end: Date.now(),
+                    // Merge metadata - preserve existing metadata set by ctx.metadata()
+                    // and only add new fields from the stream result
+                    const existingMetadata = match.state.metadata ?? {}
+                    const newMetadata = value.output.metadata ?? {}
+                    const mergedMetadata = { ...newMetadata, ...existingMetadata }
+
+                    try {
+                      await Session.updatePart({
+                        ...match,
+                        state: {
+                          status: "completed",
+                          input: value.input ?? match.state.input,
+                          output: value.output.output,
+                          metadata: mergedMetadata,
+                          title: match.state.title ?? value.output.title,
+                          time: {
+                            start: match.state.time?.start ?? Date.now(),
+                            end: Date.now(),
+                          },
+                          attachments: value.output.attachments,
                         },
-                        attachments: value.output.attachments,
-                      },
-                    })
+                      })
+                    } catch (e) {
+                      console.error("tool-result error:", value.toolCallId, e)
+                    }
 
                     delete toolcalls[value.toolCallId]
                   }

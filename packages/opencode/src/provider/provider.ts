@@ -30,6 +30,7 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { createOpenRouter, type LanguageModelV2 } from "@openrouter/ai-sdk-provider"
 import { createOpenaiCompatible as createGitHubCopilotOpenAICompatible } from "./sdk/copilot"
+import { createClaudeAgentSDK, CLAUDE_AGENT_SDK_MODELS } from "./sdk/claude-agent-sdk"
 import { createXai } from "@ai-sdk/xai"
 import { createMistral } from "@ai-sdk/mistral"
 import { createGroq } from "@ai-sdk/groq"
@@ -107,6 +108,7 @@ export namespace Provider {
   }
 
   const BUNDLED_PROVIDERS: Record<string, (options: any) => SDK> = {
+    "@anthropic-ai/claude-agent-sdk": createClaudeAgentSDK,
     "@ai-sdk/amazon-bedrock": createAmazonBedrock,
     "@ai-sdk/anthropic": createAnthropic,
     "@ai-sdk/azure": createAzure,
@@ -197,13 +199,32 @@ export namespace Provider {
         options: {},
       }
     },
+    "github-copilot-enterprise": async () => {
+      return {
+        autoload: false,
+        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
+          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID)
+          return shouldUseCopilotResponsesApi(modelID) ? sdk.responses(modelID) : sdk.chat(modelID)
+        },
+        options: {},
+      }
+    },
+    "claude-agent-sdk": async () => {
+      // Always autoload - SDK handles its own auth (CLI login, OAuth, API key, etc.)
+      return {
+        autoload: true,
+        options: {},
+        async getModel(sdk: any, modelID: string) {
+          return sdk.languageModel(modelID)
+        },
+      }
+    },
     azure: async (provider) => {
       const resource = iife(() => {
         const name = provider.options?.resourceName
         if (typeof name === "string" && name.trim() !== "") return name
         return Env.get("AZURE_RESOURCE_NAME")
       })
-
       return {
         autoload: false,
         async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
@@ -832,6 +853,15 @@ export namespace Provider {
     const config = await Config.get()
     const modelsDev = await ModelsDev.get()
     const database = mapValues(modelsDev, fromModelsDevProvider)
+
+    database["claude-agent-sdk"] = {
+      id: "claude-agent-sdk",
+      source: "custom",
+      name: "Claude Agent SDK",
+      env: [], // SDK handles its own auth (CLI login, OAuth, API key, etc.)
+      options: {},
+      models: CLAUDE_AGENT_SDK_MODELS,
+    }
 
     const disabled = new Set(config.disabled_providers ?? [])
     const enabled = config.enabled_providers ? new Set(config.enabled_providers) : null
