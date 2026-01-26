@@ -295,6 +295,7 @@ export async function createOpenCodeToolsServer(context: ToolBridgeContext) {
       description: item.description,
       inputSchema: zodToSdkShape(item.parameters),
       handler: async (args, extra) => {
+        log.info("handler ENTERED", { tool: item.id })
         const ctx = await buildToolContext(context, toolContext, args, extra, item.id)
         await Plugin.trigger(
           "tool.execute.before",
@@ -322,19 +323,34 @@ export async function createOpenCodeToolsServer(context: ToolBridgeContext) {
 
         const result = await runTool(item.execute, args, ctx)
 
-        await Plugin.trigger(
-          "tool.execute.after",
-          {
+        try {
+          await Plugin.trigger(
+            "tool.execute.after",
+            {
+              tool: item.id,
+              sessionID: ctx.sessionID,
+              callID: ctx.callID,
+            },
+            result,
+          )
+
+          log.info("tool executed", {
             tool: item.id,
-            sessionID: ctx.sessionID,
-            callID: ctx.callID,
-          },
-          result,
-        )
+            hasMetadata: !!result.metadata,
+            metaKeys: result.metadata ? Object.keys(result.metadata) : [],
+          })
+        } catch (e) {
+          log.error("post-runTool exception", { tool: item.id, error: e })
+        }
 
         // Store metadata for correlation when translate-stream processes tool_use_summary
         // This preserves rich metadata (like sessionId) that would otherwise be lost
         if (result.metadata && Object.keys(result.metadata).length > 0) {
+          log.info("storing metadata", {
+            tool: item.id,
+            argsKeys: Object.keys(args),
+            metaKeys: Object.keys(result.metadata),
+          })
           ToolMetadataRegistry.store(item.id, args, {
             title: result.title,
             metadata: result.metadata,
@@ -453,11 +469,13 @@ async function resolveAssistantMessage(sessionID: string, messageID?: string) {
     if (msg && msg.info.role === "assistant") return msg
   }
 
+  // Find the MOST RECENT assistant message (not the oldest)
+  let lastAssistant: Awaited<ReturnType<typeof MessageV2.get>> | undefined
   for await (const msg of MessageV2.stream(sessionID)) {
-    if (msg.info.role === "assistant") return msg
+    if (msg.info.role === "assistant") lastAssistant = msg
   }
 
-  return undefined
+  return lastAssistant
 }
 
 async function buildToolContext(
@@ -468,6 +486,7 @@ async function buildToolContext(
   toolName?: string,
 ): Promise<Tool.Context> {
   const callID = readToolUseId(extra)
+  log.info("buildToolContext", { toolName, callID, hasCallID: !!callID, messageID: state.messageID })
   const abort = readAbortSignal(extra) ?? context.abort ?? new AbortController().signal
   const ruleset = PermissionNext.merge(state.agent?.permission ?? [], state.session?.permission ?? [])
   const tool = callID ? { messageID: state.messageID, callID } : undefined
@@ -568,10 +587,18 @@ type UpdateInput = {
 
 async function updateToolMetadata(input: UpdateInput) {
   const { sessionID, messageID, callID, toolName, args, val } = input
+  log.info("updateToolMetadata called", { sessionID, messageID, callID, toolName, hasMetadata: !!val.metadata })
 
   // Try to update existing part
   const parts = await MessageV2.parts(messageID)
+  log.info("updateToolMetadata parts query", {
+    messageID,
+    partCount: parts.length,
+    partTypes: parts.map((p) => p.type),
+    partCallIDs: parts.filter((p) => p.type === "tool").map((p) => (p as MessageV2.ToolPart).callID),
+  })
   let match = parts.find((part): part is MessageV2.ToolPart => part.type === "tool" && part.callID === callID)
+  log.info("updateToolMetadata match result", { callID, found: !!match, matchStatus: match?.state.status })
 
   // LAYER 3: On-demand part creation if it doesn't exist
   if (!match) {
@@ -622,12 +649,23 @@ async function updateToolMetadata(input: UpdateInput) {
   }
 
   // Update storage and emit event (Session.updatePart handles both)
+  log.info("updateToolMetadata calling Session.updatePart", {
+    callID,
+    matchState: match.state.status,
+    hasMetadata: !!metadata,
+    metadataKeys: metadata ? Object.keys(metadata) : [],
+    hasSummary: !!(metadata as Record<string, unknown>)?.summary,
+  })
   await Session.updatePart(updatedPart)
+  log.info("updateToolMetadata Session.updatePart completed", { callID })
 }
 
 async function runTool(execute: unknown, args: Record<string, unknown>, ctx: Tool.Context) {
   const runner = execute as (input: Record<string, unknown>, context: Tool.Context) => Promise<ToolOutput>
-  return runner(args, ctx)
+  log.info("runTool calling execute")
+  const result = await runner(args, ctx)
+  log.info("runTool execute returned", { hasResult: !!result, hasMetadata: !!result?.metadata })
+  return result
 }
 
 function toolResult(result: ToolOutput): CallToolResult {
@@ -661,6 +699,8 @@ function normalizeMcpResult(result: unknown): CallToolResult {
 function readToolUseId(extra: unknown): string | undefined {
   const record = asRecord(extra)
   if (!record) return undefined
+
+  // Direct properties
   const direct = asString(record.tool_use_id)
   if (direct) return direct
   const camel = asString(record.toolUseId)
@@ -668,15 +708,23 @@ function readToolUseId(extra: unknown): string | undefined {
   const upper = asString(record.toolUseID)
   if (upper) return upper
 
+  // Claude Agent SDK passes it in _meta["claudecode/toolUseId"]
+  const meta = asRecord(record._meta)
+  if (meta) {
+    const claudeId = asString(meta["claudecode/toolUseId"])
+    if (claudeId) return claudeId
+  }
+
+  // MCP request format
   const request = asRecord(record.request)
   if (!request) return undefined
   const params = asRecord(request.params)
   if (!params) return undefined
-  const meta = asRecord(params.meta)
-  if (!meta) return undefined
-  const metaId = asString(meta.tool_use_id)
+  const reqMeta = asRecord(params.meta)
+  if (!reqMeta) return undefined
+  const metaId = asString(reqMeta.tool_use_id)
   if (metaId) return metaId
-  return asString(meta.toolUseId)
+  return asString(reqMeta.toolUseId)
 }
 
 function readAbortSignal(extra: unknown): AbortSignal | undefined {

@@ -8,6 +8,10 @@
  * Later, when translate-stream processes tool_use_summary, retrieve and merge the metadata.
  */
 
+import { Log } from "../../util/log"
+
+const log = Log.create({ service: "tool-metadata-registry" })
+
 type StoredMetadata = {
   title?: string
   metadata: Record<string, unknown>
@@ -37,6 +41,7 @@ function prune(entries: PendingEntry[]): PendingEntry[] {
  */
 export function store(tool: string, input: unknown, data: StoredMetadata) {
   const k = key(tool, input)
+  log.info("store", { tool, key: k, metaKeys: Object.keys(data.metadata ?? {}) })
   const existing = pending.get(k) ?? []
   const pruned = prune(existing)
   pruned.push({ data, created: Date.now() })
@@ -50,6 +55,7 @@ export function store(tool: string, input: unknown, data: StoredMetadata) {
 export function retrieve(tool: string, input: unknown): StoredMetadata | undefined {
   const k = key(tool, input)
   const entries = pending.get(k)
+  log.info("retrieve", { tool, key: k, found: !!entries, pendingKeys: Array.from(pending.keys()) })
   if (!entries || entries.length === 0) return undefined
 
   const pruned = prune(entries)

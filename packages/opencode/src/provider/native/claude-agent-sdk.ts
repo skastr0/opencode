@@ -6,7 +6,11 @@ import type {
 } from "@ai-sdk/provider"
 import { createOpenCodeToolsServer, DISABLED_SDK_TOOLS } from "./tool-bridge"
 import { mapModelId } from "./models"
+import * as ToolMetadataRegistry from "./tool-metadata-registry"
 import type { Provider } from "../provider"
+import { Log } from "../../util/log"
+
+const log = Log.create({ service: "claude-agent-sdk" })
 
 type SDKMessage = Record<string, unknown>
 
@@ -516,11 +520,15 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
 
     const message = asRecord(msg.message)
     const content = Array.isArray(message?.content) ? message.content : []
+    const msgRole = asString(message?.role)
 
     for (const block of content) {
       const item = asRecord(block)
       if (!item) continue
       const blockType = asString(item.type)
+      if (blockType === "tool_use" || blockType === "tool_result") {
+        log.info("content block", { blockType, role: msgRole })
+      }
 
       // Only emit text/thinking from assistant messages if we haven't streamed them
       // (When includePartialMessages is true, we get both stream_event and assistant messages)
@@ -553,6 +561,7 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
         const rawInput = toRecord(item.input)
         const input = isSDKNativeTool(rawToolName) ? normalizeInputParams(rawInput) : rawInput
 
+        log.info("tool_use", { toolId, rawToolName, toolName, inputKeys: Object.keys(input) })
         state.toolCalls.set(toolId, { name: toolName, input })
 
         events.push({ type: "tool-input-start", id: toolId, toolName })
@@ -573,6 +582,15 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
         const resultContent = extractToolResultContent(item.content)
         const isError = asBoolean(item.is_error) ?? false
 
+        log.info("tool_result", {
+          toolUseId,
+          toolName,
+          hasInfo: !!info,
+          inputKeys: info?.input ? Object.keys(info.input) : null,
+        })
+        // Retrieve stored metadata from ToolMetadataRegistry (MCP tool results come through here)
+        const stored = ToolMetadataRegistry.retrieve(toolName, info?.input)
+
         if (isError) {
           events.push({
             type: "tool-error",
@@ -588,9 +606,9 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
             toolCallId: toolUseId,
             toolName,
             output: {
-              title: toolName,
+              title: stored?.title ?? toolName,
               output: resultContent,
-              metadata: {},
+              metadata: stored?.metadata ?? {},
             },
             input: info?.input,
             providerExecuted: true,
@@ -679,6 +697,9 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
         const resultContent = extractToolResultContent(item.content)
         const isError = asBoolean(item.is_error) ?? false
 
+        // Retrieve stored metadata from ToolMetadataRegistry (user message tool results)
+        const stored = ToolMetadataRegistry.retrieve(toolName, info?.input)
+
         if (isError) {
           events.push({
             type: "tool-error",
@@ -694,9 +715,9 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
             toolCallId: toolUseId,
             toolName,
             output: {
-              title: toolName,
+              title: stored?.title ?? toolName,
               output: resultContent,
-              metadata: {},
+              metadata: stored?.metadata ?? {},
             },
             input: info?.input,
             providerExecuted: true,
@@ -735,13 +756,19 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
         continue
       }
 
-      const meta = summary ? { summary } : {}
+      // Retrieve stored metadata from ToolMetadataRegistry (set during MCP tool execution)
+      // This restores rich metadata like sessionId for Task tools that ctx.metadata() couldn't deliver
+      const stored = ToolMetadataRegistry.retrieve(toolName, info?.input)
+      const meta = {
+        ...(summary ? { summary } : {}),
+        ...(stored?.metadata ?? {}),
+      }
       events.push({
         type: "tool-result",
         toolCallId: toolId,
         toolName,
         output: {
-          title: toolName,
+          title: stored?.title ?? toolName,
           output: outputText,
           metadata: meta,
         },

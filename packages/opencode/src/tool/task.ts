@@ -11,6 +11,9 @@ import { iife } from "@/util/iife"
 import { defer } from "@/util/defer"
 import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
+import { Log } from "@/util/log"
+
+const log = Log.create({ service: "task-tool" })
 
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
@@ -127,6 +130,12 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         if (evt.properties.part.messageID === messageID) return
         if (evt.properties.part.type !== "tool") return
         const part = evt.properties.part
+        log.info("TaskTool received child part update", {
+          partId: part.id,
+          tool: part.tool,
+          status: part.state.status,
+          childSessionId: session.id,
+        })
         parts[part.id] = {
           id: part.id,
           tool: part.tool,
@@ -136,9 +145,15 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           },
           isSubagent: part.tool === "task",
         }
+        const summaryArray = Object.values(parts).sort((a, b) => a.id.localeCompare(b.id))
+        log.info("TaskTool calling ctx.metadata", {
+          partsCount: Object.keys(parts).length,
+          summaryLength: summaryArray.length,
+        })
         ctx.metadata({
           title: params.description,
           metadata: {
+            summary: summaryArray,
             sessionId: session.id,
             model,
           },
@@ -159,6 +174,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const maxDepth = config.experimental?.max_delegation_depth ?? 0
       const canDelegate = (session.depth ?? 0) < maxDepth
 
+      log.info("TaskTool calling SessionPrompt.prompt", { sessionId: session.id })
       const result = await SessionPrompt.prompt({
         messageID,
         sessionID: session.id,
