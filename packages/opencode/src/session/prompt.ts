@@ -722,15 +722,18 @@ export namespace SessionPrompt {
       }
       continue
     }
+    log.info("loop exited while", { sessionID })
     SessionCompaction.prune({ sessionID })
     for await (const item of MessageV2.stream(sessionID)) {
       if (item.info.role === "user") continue
       const queued = state()[sessionID]?.callbacks ?? []
+      log.info("loop returning item", { sessionID, role: item.info.role, queued: queued.length })
       for (const q of queued) {
         q.resolve(item)
       }
       return item
     }
+    log.error("loop fell through - no assistant message found", { sessionID })
     throw new Error("Impossible")
   })
 
