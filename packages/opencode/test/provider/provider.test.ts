@@ -34,6 +34,34 @@ test("provider loaded from env variable", async () => {
   })
 })
 
+test("claude agent sdk provider loads with models", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+        }),
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    init: async () => {
+      Env.set("ANTHROPIC_API_KEY", "test-api-key")
+    },
+    fn: async () => {
+      const providers = await Provider.list()
+      const sdk = providers["claude-agent-sdk"]
+      expect(sdk).toBeDefined()
+      const models = Object.keys(sdk.models)
+      expect(models).toContain("claude-opus-4-5")
+      expect(models).toContain("claude-sonnet-4-5")
+      expect(models).toContain("claude-haiku-4-5")
+    },
+  })
+})
+
 test("provider loaded from config with apiKey option", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
