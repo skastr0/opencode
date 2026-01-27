@@ -4,7 +4,7 @@ import { BashTool } from "./bash"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
-import { BatchTool } from "./batch"
+// import { BatchTool } from "./batch" // Disabled
 import { ReadTool } from "./read"
 import { TaskTool } from "./task"
 import { TodoWriteTool, TodoReadTool } from "./todo"
@@ -118,7 +118,7 @@ export namespace ToolRegistry {
       SkillTool,
       ApplyPatchTool,
       ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [LspTool] : []),
-      BatchTool, // Enable batch tool by default for parallel tool execution
+      // BatchTool, // Disabled - batch tool removed
       ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [PlanExitTool] : []),
       ...custom,
     ]
