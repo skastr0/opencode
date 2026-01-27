@@ -16,6 +16,7 @@ import { iife } from "@/util/iife"
 import { type SystemError } from "bun"
 import type { Provider } from "@/provider/provider"
 import { ModelID, ProviderID } from "@/provider/schema"
+import { ClaudeAgentSDK } from "@/provider/native/errors"
 
 export namespace MessageV2 {
   export function isMedia(mime: string) {
@@ -926,6 +927,74 @@ export namespace MessageV2 {
               syscall: (e as SystemError).syscall ?? "",
               message: (e as SystemError).message ?? "",
             },
+          },
+          { cause: e },
+        ).toObject()
+      // Claude Agent SDK error types
+      case ClaudeAgentSDK.AuthError.isInstance(e):
+        return new MessageV2.AuthError(
+          {
+            providerID: "claude-agent-sdk",
+            message: e.data.message,
+          },
+          { cause: e },
+        ).toObject()
+      case ClaudeAgentSDK.RateLimitError.isInstance(e):
+        return new MessageV2.APIError(
+          {
+            message: e.data.message,
+            statusCode: 429,
+            isRetryable: true,
+            responseHeaders: e.data.retryAfterMs ? { "retry-after-ms": String(e.data.retryAfterMs) } : undefined,
+          },
+          { cause: e },
+        ).toObject()
+      case ClaudeAgentSDK.ServerError.isInstance(e):
+        return new MessageV2.APIError(
+          {
+            message: e.data.message,
+            statusCode: e.data.statusCode,
+            isRetryable: true,
+          },
+          { cause: e },
+        ).toObject()
+      case ClaudeAgentSDK.SessionError.isInstance(e):
+        return new MessageV2.APIError(
+          {
+            message: e.data.message,
+            isRetryable: false,
+            metadata: e.data.sessionId ? { sessionId: e.data.sessionId } : undefined,
+          },
+          { cause: e },
+        ).toObject()
+      case ClaudeAgentSDK.ModelError.isInstance(e):
+        return new MessageV2.APIError(
+          {
+            message: e.data.message,
+            isRetryable: false,
+            metadata: e.data.code ? { code: e.data.code } : undefined,
+          },
+          { cause: e },
+        ).toObject()
+      case ClaudeAgentSDK.ToolError.isInstance(e):
+        // Tool errors are not API errors - they represent tool execution failures
+        return new MessageV2.APIError(
+          {
+            message: `Tool "${e.data.toolName}" failed: ${e.data.message}`,
+            isRetryable: false,
+            metadata: {
+              toolName: e.data.toolName,
+              toolCallId: e.data.toolCallId,
+            },
+          },
+          { cause: e },
+        ).toObject()
+      case ClaudeAgentSDK.Error.isInstance(e):
+        return new MessageV2.APIError(
+          {
+            message: e.data.message,
+            isRetryable: e.data.isRetryable,
+            metadata: e.data.code ? { code: e.data.code } : undefined,
           },
           { cause: e },
         ).toObject()

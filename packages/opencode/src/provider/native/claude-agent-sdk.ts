@@ -9,6 +9,7 @@ import { mapModelId } from "./models"
 import * as ToolMetadataRegistry from "./tool-metadata-registry"
 import type { Provider } from "../provider"
 import { Log } from "../../util/log"
+import { ClaudeAgentSDK } from "./errors"
 
 const log = Log.create({ service: "claude-agent-sdk" })
 
@@ -178,8 +179,19 @@ export async function streamClaudeNative(input: ClaudeNativeInput): Promise<Clau
   const options = await buildQueryOptions(input)
   const query = await loadQuery()
 
+  log.info("streamClaudeNative starting", {
+    sessionID: input.sessionID,
+    messageID: input.messageID,
+    modelId: input.model.id,
+    providerId: input.model.providerID,
+    hasResume: !!input.sdkSessionId,
+    workingDirectory: input.workingDirectory,
+    permissionMode: input.permissionMode,
+  })
+
   const fullStream = (async function* (): AsyncGenerator<ClaudeNativeStreamEvent> {
     const state = createStreamState()
+    let messageCount = 0
     yield { type: "start" }
     yield { type: "start-step" }
 
@@ -197,6 +209,35 @@ export async function streamClaudeNative(input: ClaudeNativeInput): Promise<Clau
       queryInstance = query({ prompt, options })
 
       for await (const msg of queryInstance) {
+        messageCount++
+
+        // Log every message type for debugging (but not content to avoid spam)
+        const msgType = asString(msg.type)
+        const msgSubtype = asString(msg.subtype)
+        const hasErrorField = msg.error !== undefined
+        const hasIsErrorFlag = msg.is_error === true || msg.isError === true
+
+        // If this message has an error field or is_error flag, log the full details
+        if (hasErrorField || hasIsErrorFlag) {
+          log.error("SDK message with error", {
+            messageCount,
+            type: msgType,
+            subtype: msgSubtype,
+            // Error object details
+            error: msg.error,
+            errorMessage: asString(asRecord(msg.error)?.message),
+            errorCode: asString(asRecord(msg.error)?.code),
+            errorType: asString(asRecord(msg.error)?.type),
+            // Boolean error flags
+            is_error: msg.is_error,
+            isError: msg.isError,
+            // Include stop_reason if present (can indicate error conditions)
+            stopReason: msg.stop_reason ?? msg.stopReason,
+            // Include truncated raw message for debugging
+            rawMessage: JSON.stringify(msg).slice(0, 2000),
+          })
+        }
+
         if (input.abort.aborted) {
           aborted = true
           break
@@ -216,13 +257,35 @@ export async function streamClaudeNative(input: ClaudeNativeInput): Promise<Clau
         }
 
         // Check for errors
-        if (asString(msg.type) === "error") {
+        if (msgType === "error") {
+          log.error("SDK error message received", {
+            messageCount,
+            error: msg.error,
+            rawMessage: JSON.stringify(msg).slice(0, 500),
+          })
           yield { type: "error", error: readError(msg) }
           return
         }
       }
+
+      log.info("streamClaudeNative stream completed", {
+        messageCount,
+        aborted,
+        finishReason: state.finishReason,
+        usage: state.usage,
+      })
     } catch (error) {
-      yield { type: "error", error }
+      // Log the raw error for debugging
+      log.error("SDK stream error caught", {
+        messageCount,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: error?.constructor?.name,
+      })
+
+      // Classify caught errors (e.g., "Claude Code process exited with code 1")
+      const classified = classifyCaughtError(error)
+      yield { type: "error", error: classified }
       return
     } finally {
       queryInstance?.close()
@@ -373,6 +436,8 @@ async function buildQueryOptions(input: ClaudeNativeInput): Promise<QueryOptions
     bypassAgentCheck: input.bypassAgentCheck,
   })
 
+  const claudeExecutable = getClaudeExecutable()
+
   const options: QueryOptions = {
     model: mapModelId(input.model.id),
     permissionMode: input.permissionMode ?? "bypassPermissions",
@@ -386,7 +451,7 @@ async function buildQueryOptions(input: ClaudeNativeInput): Promise<QueryOptions
       ENABLE_TOOL_SEARCH: "false",
       ENABLE_EXPERIMENTAL_MCP_CLI: "false",
     },
-    pathToClaudeCodeExecutable: getClaudeExecutable(),
+    pathToClaudeCodeExecutable: claudeExecutable,
     mcpServers: {
       opencode: server,
     },
@@ -409,17 +474,23 @@ async function loadQuery(): Promise<(params: { prompt: QueryPrompt; options?: Qu
       __opencodeSdkQuery?: (params: { prompt: QueryPrompt; options?: QueryOptions }) => Query
     }
   ).__opencodeSdkQuery
-  if (hook) return hook
-
-  const mod = (await import("@anthropic-ai/claude-agent-sdk")) as {
-    query?: (params: { prompt: QueryPrompt; options?: QueryOptions }) => Query
+  if (hook) {
+    return hook
   }
 
-  if (!mod.query) {
-    throw new Error("Claude Agent SDK not available")
-  }
+  try {
+    const mod = (await import("@anthropic-ai/claude-agent-sdk")) as {
+      query?: (params: { prompt: QueryPrompt; options?: QueryOptions }) => Query
+    }
 
-  return mod.query
+    if (!mod.query) {
+      throw new Error("Claude Agent SDK not available - query function missing")
+    }
+
+    return mod.query
+  } catch (error) {
+    throw error
+  }
 }
 
 function createStreamState() {
@@ -518,17 +589,35 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
       state.reasoningId = undefined
     }
 
+    // Check for error field on assistant messages (SDK can report errors here)
+    if (msg.error !== undefined) {
+      const errRecord = asRecord(msg.error)
+      log.error("Assistant message contains error", {
+        error: msg.error,
+        errorMessage: asString(errRecord?.message),
+        errorCode: asString(errRecord?.code),
+        errorType: asString(errRecord?.type),
+        stopReason: asString(msg.stop_reason),
+      })
+    }
+
     const message = asRecord(msg.message)
     const content = Array.isArray(message?.content) ? message.content : []
     const msgRole = asString(message?.role)
+
+    // Check stop_reason for error conditions
+    const stopReason = asString(msg.stop_reason) ?? asString(message?.stop_reason)
+    if (stopReason && stopReason !== "end_turn" && stopReason !== "tool_use") {
+      log.warn("Unusual stop_reason in assistant message", {
+        stopReason,
+        hasContent: content.length > 0,
+      })
+    }
 
     for (const block of content) {
       const item = asRecord(block)
       if (!item) continue
       const blockType = asString(item.type)
-      if (blockType === "tool_use" || blockType === "tool_result") {
-        log.info("content block", { blockType, role: msgRole })
-      }
 
       // Only emit text/thinking from assistant messages if we haven't streamed them
       // (When includePartialMessages is true, we get both stream_event and assistant messages)
@@ -561,7 +650,6 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
         const rawInput = toRecord(item.input)
         const input = isSDKNativeTool(rawToolName) ? normalizeInputParams(rawInput) : rawInput
 
-        log.info("tool_use", { toolId, rawToolName, toolName, inputKeys: Object.keys(input) })
         state.toolCalls.set(toolId, { name: toolName, input })
 
         events.push({ type: "tool-input-start", id: toolId, toolName })
@@ -582,12 +670,6 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
         const resultContent = extractToolResultContent(item.content)
         const isError = asBoolean(item.is_error) ?? false
 
-        log.info("tool_result", {
-          toolUseId,
-          toolName,
-          hasInfo: !!info,
-          inputKeys: info?.input ? Object.keys(info.input) : null,
-        })
         // Retrieve stored metadata from ToolMetadataRegistry (MCP tool results come through here)
         const stored = ToolMetadataRegistry.retrieve(toolName, info?.input)
 
@@ -629,6 +711,21 @@ function processSDKMessage(msg: SDKMessage, state: ReturnType<typeof createStrea
 
   // Handle result messages - these contain final cumulative usage data
   if (type === "result") {
+    const subtype = asString(msg.subtype)
+    const isError = subtype === "error" || msg.error !== undefined
+
+    // Log error results for debugging
+    if (isError) {
+      const errRecord = asRecord(msg.error)
+      log.error("SDK result indicates error", {
+        subtype,
+        error: msg.error,
+        errorMessage: asString(errRecord?.message),
+        errorCode: asString(errRecord?.code),
+        rawMessage: JSON.stringify(msg).slice(0, 1000),
+      })
+    }
+
     // The SDK sends cumulative usage in result messages
     // Format: { usage: { input_tokens, output_tokens, ... }, modelUsage: { [model]: { inputTokens, ... } } }
     const usage = readResultUsage(msg)
@@ -908,8 +1005,20 @@ function readToolErrorMessage(value: unknown): string | undefined {
 
 function readError(msg: SDKMessage): Error {
   const err = asRecord(msg.error)
-  const message = asString(err?.message)
-  return message ? new Error(message) : new Error("Claude Agent SDK error")
+  const message = asString(err?.message) ?? "Claude Agent SDK error"
+  const code = asString(err?.code) ?? asString(err?.type)
+  const statusCode = asNumber(err?.status) ?? asNumber(err?.statusCode) ?? asNumber(err?.status_code)
+  const retryAfterMs = asNumber(err?.retry_after_ms) ?? asNumber(err?.retryAfterMs)
+  const sessionId = asString(msg.session_id) ?? asString(msg.sessionId)
+
+  return ClaudeAgentSDK.classify({
+    message,
+    code,
+    type: asString(err?.type),
+    statusCode,
+    retryAfterMs,
+    sessionId,
+  })
 }
 
 function getToolIds(msg: SDKMessage, state: ReturnType<typeof createStreamState>): string[] {
@@ -991,4 +1100,82 @@ function extractToolResultContent(content: unknown): string {
     return JSON.stringify(content)
   }
   return String(content ?? "")
+}
+
+/**
+ * Classify errors caught from the SDK (thrown exceptions, not message-based errors)
+ * This handles errors like "Claude Code process exited with code 1"
+ */
+function classifyCaughtError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error)
+  const stack = error instanceof Error ? error.stack : undefined
+
+  // Try to extract exit code from message
+  const exitCodeMatch = message.match(/exited with code (\d+)/)
+  const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : undefined
+
+  // Extract additional context from the error
+  const context: string[] = []
+
+  // Check for common SDK process errors and provide helpful context
+  if (message.includes("Claude Code process exited")) {
+    if (exitCode === 1) {
+      // Generic error - could be many things
+      context.push("The Claude Code CLI process failed.")
+      context.push("This could be due to:")
+      context.push("  - Authentication issues (try running 'claude login')")
+      context.push("  - Network connectivity problems")
+      context.push("  - Invalid configuration")
+      context.push("  - An internal SDK error")
+    } else if (exitCode === 127) {
+      context.push("The Claude Code CLI was not found.")
+      context.push("Ensure 'claude' is installed and available in your PATH.")
+    } else if (exitCode === 126) {
+      context.push("Permission denied when executing Claude Code CLI.")
+    }
+  }
+
+  // Check for spawn/process errors
+  if (message.includes("ENOENT") || message.includes("spawn")) {
+    context.push("Failed to start Claude Code process.")
+    context.push("Ensure the Claude Code CLI is installed: npm install -g @anthropic-ai/claude-code")
+  }
+
+  // Check for connection errors
+  if (message.includes("ECONNREFUSED") || message.includes("ECONNRESET")) {
+    context.push("Connection to Claude service failed.")
+    context.push("Check your network connection and try again.")
+  }
+
+  // Check for timeout
+  if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
+    context.push("Request timed out.")
+    context.push("The Claude service may be experiencing high load.")
+  }
+
+  // Build enriched message
+  const enrichedMessage = context.length > 0
+    ? `${message}\n\n${context.join("\n")}`
+    : message
+
+  // Use classify to get the appropriate error type with retryability
+  const classified = ClaudeAgentSDK.classify({
+    message: enrichedMessage,
+    code: exitCode !== undefined ? `exit_code_${exitCode}` : undefined,
+    statusCode: exitCode,
+  })
+
+  // Preserve the original stack trace if available
+  if (stack && classified instanceof Error) {
+    classified.stack = stack
+  }
+
+  log.error("SDK process error", {
+    originalMessage: message,
+    exitCode,
+    classified: classified.name,
+    enrichedMessage: context.length > 0 ? context.join(" | ") : undefined,
+  })
+
+  return classified
 }
