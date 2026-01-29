@@ -491,12 +491,19 @@ async function buildToolContext(
   const ruleset = PermissionNext.merge(state.agent?.permission ?? [], state.session?.permission ?? [])
   const tool = callID ? { messageID: state.messageID, callID } : undefined
 
+  // Fetch messages for context
+  const messages: MessageV2.WithParts[] = []
+  for await (const msg of MessageV2.stream(context.sessionID)) {
+    messages.push(msg)
+  }
+
   return {
     sessionID: context.sessionID,
     messageID: state.messageID,
     agent: state.agentName,
     abort,
     callID,
+    messages,
     extra: {
       model: context.model,
       bypassAgentCheck: context.bypassAgentCheck ?? false,

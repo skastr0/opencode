@@ -29,6 +29,8 @@ import {
   Todo,
   QuestionAnswer,
   QuestionInfo,
+  type ToolState,
+  type ToolStateError,
 } from "@opencode-ai/sdk/v2"
 import { useData } from "../context"
 import { useFileComponent } from "../context/file"

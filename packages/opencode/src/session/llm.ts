@@ -498,6 +498,10 @@ export namespace LLM {
 
   function buildThinkingOptions(model: Provider.Model, level: ThinkingEffort.Level): Record<string, any> {
     const npm = model.api.npm
+    const id = model.id.toLowerCase()
+
+    // Kimi K2.5 doesn't support agent thinking options
+    if (id.includes("kimi-k2.5")) return {}
 
     // Provider-specific budget limits (from official API docs)
     // Anthropic: 32,000 max (docs.anthropic.com/en/build-with-claude/extended-thinking)
