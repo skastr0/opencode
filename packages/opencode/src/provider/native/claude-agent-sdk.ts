@@ -1154,9 +1154,7 @@ function classifyCaughtError(error: unknown): Error {
   }
 
   // Build enriched message
-  const enrichedMessage = context.length > 0
-    ? `${message}\n\n${context.join("\n")}`
-    : message
+  const enrichedMessage = context.length > 0 ? `${message}\n\n${context.join("\n")}` : message
 
   // Use classify to get the appropriate error type with retryability
   const classified = ClaudeAgentSDK.classify({

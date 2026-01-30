@@ -54,11 +54,7 @@ export function FormatError(input: unknown) {
     const retryInfo = input.data.retryAfterMs
       ? `Retry after ${Math.ceil(input.data.retryAfterMs / 1000)} seconds.`
       : "Please wait and try again."
-    return [
-      "Claude Agent SDK rate limited",
-      input.data.message,
-      retryInfo,
-    ].join("\n")
+    return ["Claude Agent SDK rate limited", input.data.message, retryInfo].join("\n")
   }
   if (ClaudeAgentSDK.ServerError.isInstance(input)) {
     return [
@@ -69,12 +65,7 @@ export function FormatError(input: unknown) {
     ].join("\n")
   }
   if (ClaudeAgentSDK.SessionError.isInstance(input)) {
-    return [
-      "Claude session error",
-      input.data.message,
-      "",
-      "Try starting a new session or conversation.",
-    ].join("\n")
+    return ["Claude session error", input.data.message, "", "Try starting a new session or conversation."].join("\n")
   }
   if (ClaudeAgentSDK.ModelError.isInstance(input)) {
     return [
@@ -85,10 +76,7 @@ export function FormatError(input: unknown) {
     ].join("\n")
   }
   if (ClaudeAgentSDK.ToolError.isInstance(input)) {
-    return [
-      `Tool execution failed: ${input.data.toolName}`,
-      input.data.message,
-    ].join("\n")
+    return [`Tool execution failed: ${input.data.toolName}`, input.data.message].join("\n")
   }
   if (ClaudeAgentSDK.Error.isInstance(input)) {
     const retryHint = input.data.isRetryable

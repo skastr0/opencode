@@ -102,7 +102,6 @@ describe("session.llm.hasToolCalls", () => {
   })
 })
 
-<<<<<<< HEAD
 type Capture = {
   url: URL
   headers: Headers

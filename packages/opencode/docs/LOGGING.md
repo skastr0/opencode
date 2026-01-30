@@ -26,12 +26,12 @@ opencode debug paths
 
 ## Log Levels
 
-| Level | Description |
-|-------|-------------|
+| Level | Description                                                          |
+| ----- | -------------------------------------------------------------------- |
 | DEBUG | Verbose debugging information (only enabled in local dev by default) |
-| INFO | General operational messages |
-| WARN | Warning conditions |
-| ERROR | Error conditions |
+| INFO  | General operational messages                                         |
+| WARN  | Warning conditions                                                   |
+| ERROR | Error conditions                                                     |
 
 ### Default Behavior
 
@@ -79,9 +79,7 @@ OpenCode determines if it's running in dev mode via the `OPENCODE_CHANNEL` compi
 
 ```typescript
 // In installation/index.ts
-export const CHANNEL = typeof OPENCODE_CHANNEL === "string"
-  ? OPENCODE_CHANNEL
-  : "local"  // Defaults to "local" when not set
+export const CHANNEL = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : "local" // Defaults to "local" when not set
 
 export function isLocal() {
   return CHANNEL === "local"
@@ -89,12 +87,14 @@ export function isLocal() {
 ```
 
 When running `bun dev`, `OPENCODE_CHANNEL` is not defined, so it defaults to `"local"`, enabling:
+
 - DEBUG log level by default
 - Logs written to `dev.log` instead of timestamped files
 
 ## Log File Rotation
 
 The logging system automatically cleans up old log files:
+
 - Keeps the last 5-10 timestamped log files
 - Deletes older files automatically
 - `dev.log` is NOT rotated (grows indefinitely)
@@ -112,16 +112,19 @@ When you see errors like "Claude Code exited with code 1", the underlying cause 
 ### Troubleshooting Steps
 
 1. **Check the log file for preceding errors:**
+
    ```bash
    grep -B 20 "exited with code" ~/.local/share/opencode/log/dev.log
    ```
 
 2. **Look for authentication issues:**
+
    ```bash
    grep -i "authentication\|api.key\|unauthorized" ~/.local/share/opencode/log/*.log
    ```
 
 3. **Check the Claude CLI directly:**
+
    ```bash
    which claude
    claude login
