@@ -2011,7 +2011,7 @@ function Task(props: ToolProps<typeof TaskTool>) {
     return messages().flatMap((msg) =>
       (sync.data.part[msg.id] ?? [])
         .filter((part): part is ToolPart => part.type === "tool")
-        .map((part) => ({ tool: part.tool, state: part.state })),
+        .map((part) => ({ tool: part.tool, state: part.state, isSubagent: part.tool === "task" })),
     )
   })
 
