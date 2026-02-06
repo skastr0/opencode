@@ -1,6 +1,6 @@
 import { BusEvent } from "@/bus/bus-event"
 import z from "zod"
-import { formatPatch, structuredPatch } from "diff"
+import { formatPatch, parsePatch, structuredPatch } from "diff"
 import path from "path"
 import fs from "fs"
 import ignore from "ignore"
@@ -275,6 +275,7 @@ export namespace File {
       added: z.number().int(),
       removed: z.number().int(),
       status: z.enum(["added", "deleted", "modified"]),
+      stage: z.enum(["staged", "unstaged", "untracked"]).optional(),
     })
     .meta({
       ref: "File",
@@ -343,8 +344,8 @@ export namespace File {
     return runPromiseInstance(FileService.use((s) => s.status()))
   }
 
-  export async function read(file: string): Promise<Content> {
-    return runPromiseInstance(FileService.use((s) => s.read(file)))
+  export async function read(file: string, stage?: "staged" | "unstaged"): Promise<Content> {
+    return runPromiseInstance(FileService.use((s) => s.read(file, stage)))
   }
 
   export async function list(dir?: string) {
@@ -360,7 +361,7 @@ export namespace FileService {
   export interface Service {
     readonly init: () => Effect.Effect<void>
     readonly status: () => Effect.Effect<File.Info[]>
-    readonly read: (file: string) => Effect.Effect<File.Content>
+    readonly read: (file: string, stage?: "staged" | "unstaged") => Effect.Effect<File.Content>
     readonly list: (dir?: string) => Effect.Effect<File.Node[]>
     readonly search: (input: {
       query: string
@@ -455,28 +456,104 @@ export class FileService extends ServiceMap.Service<FileService, FileService.Ser
         if (instance.project.vcs !== "git") return []
 
         return yield* Effect.promise(async () => {
-          const diffOutput = (
-            await git(["-c", "core.fsmonitor=false", "-c", "core.quotepath=false", "diff", "--numstat", "HEAD"], {
+          const staged = (
+            await git(
+              [
+                "-c",
+                "core.fsmonitor=false",
+                "-c",
+                "core.quotepath=false",
+                "diff",
+                "--cached",
+                "--numstat",
+                "--relative",
+              ],
+              { cwd: instance.directory },
+            )
+          ).text()
+
+          const unstaged = (
+            await git(["-c", "core.fsmonitor=false", "-c", "core.quotepath=false", "diff", "--numstat", "--relative"], {
               cwd: instance.directory,
             })
           ).text()
 
-          const changedFiles: File.Info[] = []
+          const stagedDeleted = new Set(
+            (
+              await git(
+                [
+                  "-c",
+                  "core.fsmonitor=false",
+                  "-c",
+                  "core.quotepath=false",
+                  "diff",
+                  "--name-only",
+                  "--diff-filter=D",
+                  "--cached",
+                  "--relative",
+                ],
+                { cwd: instance.directory },
+              )
+            )
+              .text()
+              .trim()
+              .split("\n")
+              .filter(Boolean),
+          )
 
-          if (diffOutput.trim()) {
-            const lines = diffOutput.trim().split("\n")
-            for (const line of lines) {
-              const [added, removed, filepath] = line.split("\t")
-              changedFiles.push({
-                path: filepath,
+          const unstagedDeleted = new Set(
+            (
+              await git(
+                [
+                  "-c",
+                  "core.fsmonitor=false",
+                  "-c",
+                  "core.quotepath=false",
+                  "diff",
+                  "--name-only",
+                  "--diff-filter=D",
+                  "--relative",
+                ],
+                { cwd: instance.directory },
+              )
+            )
+              .text()
+              .trim()
+              .split("\n")
+              .filter(Boolean),
+          )
+
+          const changed: File.Info[] = []
+
+          const parse = (output: string, stage: "staged" | "unstaged", deleted: Set<string>) => {
+            if (!output.trim()) return
+            for (const line of output.trim().split("\n")) {
+              const [added, removed, file] = line.split("\t")
+              if (!file) continue
+              const status = deleted.has(file) ? "deleted" : "modified"
+              if (status === "deleted") deleted.delete(file)
+              changed.push({
+                path: file,
                 added: added === "-" ? 0 : parseInt(added, 10),
                 removed: removed === "-" ? 0 : parseInt(removed, 10),
-                status: "modified",
+                status,
+                stage,
               })
             }
           }
 
-          const untrackedOutput = (
+          parse(staged, "staged", stagedDeleted)
+          parse(unstaged, "unstaged", unstagedDeleted)
+
+          for (const file of stagedDeleted) {
+            changed.push({ path: file, added: 0, removed: 0, status: "deleted", stage: "staged" })
+          }
+
+          for (const file of unstagedDeleted) {
+            changed.push({ path: file, added: 0, removed: 0, status: "deleted", stage: "unstaged" })
+          }
+
+          const untracked = (
             await git(
               [
                 "-c",
@@ -487,23 +564,20 @@ export class FileService extends ServiceMap.Service<FileService, FileService.Ser
                 "--others",
                 "--exclude-standard",
               ],
-              {
-                cwd: instance.directory,
-              },
+              { cwd: instance.directory },
             )
           ).text()
 
-          if (untrackedOutput.trim()) {
-            const untrackedFiles = untrackedOutput.trim().split("\n")
-            for (const filepath of untrackedFiles) {
+          if (untracked.trim()) {
+            for (const file of untracked.trim().split("\n")) {
               try {
-                const content = await Filesystem.readText(path.join(instance.directory, filepath))
-                const lines = content.split("\n").length
-                changedFiles.push({
-                  path: filepath,
-                  added: lines,
+                const content = await Filesystem.readText(path.join(instance.directory, file))
+                changed.push({
+                  path: file,
+                  added: content.split("\n").length,
                   removed: 0,
                   status: "added",
+                  stage: "untracked",
                 })
               } catch {
                 continue
@@ -511,50 +585,13 @@ export class FileService extends ServiceMap.Service<FileService, FileService.Ser
             }
           }
 
-          // Get deleted files
-          const deletedOutput = (
-            await git(
-              [
-                "-c",
-                "core.fsmonitor=false",
-                "-c",
-                "core.quotepath=false",
-                "diff",
-                "--name-only",
-                "--diff-filter=D",
-                "HEAD",
-              ],
-              {
-                cwd: instance.directory,
-              },
-            )
-          ).text()
-
-          if (deletedOutput.trim()) {
-            const deletedFiles = deletedOutput.trim().split("\n")
-            for (const filepath of deletedFiles) {
-              changedFiles.push({
-                path: filepath,
-                added: 0,
-                removed: 0, // Could get original line count but would require another git command
-                status: "deleted",
-              })
-            }
-          }
-
-          return changedFiles.map((x) => {
-            const full = path.isAbsolute(x.path) ? x.path : path.join(instance.directory, x.path)
-            return {
-              ...x,
-              path: path.relative(instance.directory, full),
-            }
-          })
+          return changed
         })
       })
 
-      const read = Effect.fn("FileService.read")(function* (file: string) {
+      const read = Effect.fn("FileService.read")(function* (file: string, stage?: "staged" | "unstaged") {
         return yield* Effect.promise(async (): Promise<File.Content> => {
-          using _ = log.time("read", { file })
+          using _ = log.time("read", { file, stage })
           const full = path.join(instance.directory, file)
 
           if (!Instance.containsPath(full)) {
@@ -598,22 +635,40 @@ export class FileService extends ServiceMap.Service<FileService, FileService.Ser
           const content = (await Filesystem.readText(full).catch(() => "")).trim()
 
           if (instance.project.vcs === "git") {
-            let diff = (
-              await git(["-c", "core.fsmonitor=false", "diff", "--", file], { cwd: instance.directory })
+            const staged = (
+              await git(["-c", "core.fsmonitor=false", "-c", "core.quotepath=false", "diff", "--cached", "--", file], {
+                cwd: instance.directory,
+              })
             ).text()
-            if (!diff.trim()) {
-              diff = (
-                await git(["-c", "core.fsmonitor=false", "diff", "--staged", "--", file], { cwd: instance.directory })
-              ).text()
-            }
+
+            const unstaged = (
+              await git(["-c", "core.fsmonitor=false", "-c", "core.quotepath=false", "diff", "--", file], {
+                cwd: instance.directory,
+              })
+            ).text()
+
+            const diff =
+              stage === "staged" ? staged : stage === "unstaged" ? unstaged : unstaged.trim() ? unstaged : staged
+
             if (diff.trim()) {
-              const original = (await git(["show", `HEAD:${file}`], { cwd: instance.directory })).text()
-              const patch = structuredPatch(file, file, original, content, "old", "new", {
+              const patch = parsePatch(diff)[0]
+              if (!patch) return { type: "text", content, diff }
+              return { type: "text", content, diff, patch }
+            }
+
+            const untracked = (
+              await git(
+                ["-c", "core.fsmonitor=false", "-c", "core.quotepath=false", "status", "--porcelain", "--", file],
+                { cwd: instance.directory },
+              )
+            ).text()
+
+            if ((stage === undefined || stage === "unstaged") && untracked.trim().startsWith("?? ")) {
+              const patch = structuredPatch(file, file, "", content, "old", "new", {
                 context: Infinity,
                 ignoreWhitespace: true,
               })
-              const diff = formatPatch(patch)
-              return { type: "text", content, patch, diff }
+              return { type: "text", content, patch, diff: formatPatch(patch) }
             }
           }
           return { type: "text", content }

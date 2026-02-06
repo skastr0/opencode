@@ -11705,6 +11705,10 @@
           "status": {
             "type": "string",
             "enum": ["added", "deleted", "modified"]
+          },
+          "stage": {
+            "type": "string",
+            "enum": ["staged", "unstaged", "untracked"]
           }
         },
         "required": ["path", "added", "removed", "status"]

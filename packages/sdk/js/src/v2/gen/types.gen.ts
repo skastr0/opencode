@@ -1849,6 +1849,7 @@ export type File = {
   added: number
   removed: number
   status: "added" | "deleted" | "modified"
+  stage?: "staged" | "unstaged" | "untracked"
 }
 
 export type McpStatusConnected = {
@@ -4192,6 +4193,7 @@ export type FileReadData = {
     directory?: string
     workspace?: string
     path: string
+    stage?: "staged" | "unstaged"
   }
   url: "/file/content"
 }

@@ -2829,6 +2829,7 @@ export class File extends HeyApiClient {
       directory?: string
       workspace?: string
       path: string
+      stage?: "staged" | "unstaged"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -2840,6 +2841,7 @@ export class File extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "query", key: "path" },
+            { in: "query", key: "stage" },
           ],
         },
       ],
