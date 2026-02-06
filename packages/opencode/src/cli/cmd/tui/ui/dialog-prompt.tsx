@@ -70,11 +70,18 @@ export function DialogPrompt(props: DialogPromptProps) {
 
 DialogPrompt.show = (dialog: DialogContext, title: string, options?: Omit<DialogPromptProps, "title">) => {
   return new Promise<string | null>((resolve) => {
+    let done = false
+    const finish = (value: string | null) => {
+      if (done) return
+      done = true
+      resolve(value)
+      dialog.clear()
+    }
     dialog.replace(
       () => (
-        <DialogPrompt title={title} {...options} onConfirm={(value) => resolve(value)} onCancel={() => resolve(null)} />
+        <DialogPrompt title={title} {...options} onConfirm={(value) => finish(value)} onCancel={() => finish(null)} />
       ),
-      () => resolve(null),
+      () => finish(null),
     )
   })
 }
