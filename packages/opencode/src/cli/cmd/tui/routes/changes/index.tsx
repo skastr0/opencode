@@ -2,6 +2,7 @@ import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { usePromptRef } from "@tui/context/prompt"
 import { useRoute, useRouteData } from "@tui/context/route"
 import { useTheme } from "@tui/context/theme"
+import { useDialog } from "@tui/ui/dialog"
 import { useToast } from "@tui/ui/toast"
 import { createMemo, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -14,6 +15,7 @@ export function Changes() {
   const route = useRouteData("changes")
   const { navigate } = useRoute()
   const { theme } = useTheme()
+  const dialog = useDialog()
   const toast = useToast()
   const prompt = usePromptRef()
   const dimensions = useTerminalDimensions()
@@ -45,7 +47,7 @@ export function Changes() {
       parts: current?.parts ?? [],
     }
     const target = route.returnTo
-    setComments([])
+    setComments(() => [])
     if (!target || target.type === "home") {
       navigate({ type: "home", initialPrompt })
       return
@@ -54,6 +56,8 @@ export function Changes() {
   }
 
   useKeyboard((evt) => {
+    if (dialog.stack.length > 0) return
+
     if (evt.name === "S" || (evt.name === "s" && evt.shift)) {
       evt.preventDefault()
       submit()
