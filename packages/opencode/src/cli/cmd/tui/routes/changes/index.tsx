@@ -21,6 +21,7 @@ export function Changes() {
   const dimensions = useTerminalDimensions()
   const [selected, setSelected] = createSignal<FileSelection | null>(null)
   const [summary, setSummary] = createSignal<FileTotals>({ files: 0, added: 0, removed: 0 })
+  const [dirSelected, setDirSelected] = createSignal(false)
   const [comments, setComments] = createStore<ReviewComment[]>([])
 
   const commentTotal = createMemo(() => comments.length)
@@ -71,7 +72,12 @@ export function Changes() {
     <box width={dimensions().width} height={dimensions().height} padding={1} flexDirection="column" gap={1}>
       <box flexDirection="row" gap={1} flexGrow={1}>
         <box width={38} height="100%" backgroundColor={theme.backgroundPanel}>
-          <FileList onSelect={setSelected} onSummary={setSummary} comments={commentCount()} />
+          <FileList
+            onSelect={setSelected}
+            onSummary={setSummary}
+            onDirHighlight={setDirSelected}
+            comments={commentCount()}
+          />
         </box>
         <box flexGrow={1} height="100%" backgroundColor={theme.backgroundPanel} padding={1}>
           <DiffPane
@@ -88,6 +94,7 @@ export function Changes() {
         comments={commentTotal()}
         submit={commentTotal() > 0}
         commenting={!!selected()}
+        dirSelected={dirSelected()}
       />
     </box>
   )

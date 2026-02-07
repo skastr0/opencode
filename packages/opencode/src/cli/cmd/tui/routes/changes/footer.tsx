@@ -8,6 +8,7 @@ type ChangesFooterProps = {
   comments: number
   submit: boolean
   commenting?: boolean
+  dirSelected?: boolean
 }
 
 export function ChangesFooter(props: ChangesFooterProps) {
@@ -24,6 +25,10 @@ export function ChangesFooter(props: ChangesFooterProps) {
       <box flexDirection="row" gap={2} flexShrink={0}>
         <text fg={theme.textMuted}>esc close</text>
         <text fg={theme.textMuted}>↑↓ navigate</text>
+        <text fg={theme.textMuted}>/ filter</text>
+        <Show when={props.dirSelected}>
+          <text fg={theme.textMuted}>space toggle</text>
+        </Show>
         <Show when={props.commenting}>
           <text fg={theme.textMuted}>c comment</text>
         </Show>
