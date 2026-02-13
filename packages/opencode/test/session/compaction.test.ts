@@ -225,6 +225,27 @@ describe("session.compaction.isOverflow", () => {
       },
     })
   })
+
+  test("returns true when forced even if compaction.auto is disabled", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({
+            compaction: { auto: false },
+          }),
+        )
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const model = createModel({ context: 100_000, output: 32_000 })
+        const tokens = { input: 75_000, output: 5_000, reasoning: 0, cache: { read: 0, write: 0 } }
+        expect(await SessionCompaction.isOverflow({ tokens, model, force: true })).toBe(true)
+      },
+    })
+  })
 })
 
 describe("util.token.estimate", () => {

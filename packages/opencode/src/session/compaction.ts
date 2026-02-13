@@ -30,9 +30,13 @@ export namespace SessionCompaction {
 
   const COMPACTION_BUFFER = 20_000
 
-  export async function isOverflow(input: { tokens: MessageV2.Assistant["tokens"]; model: Provider.Model }) {
+  export async function isOverflow(input: {
+    tokens: MessageV2.Assistant["tokens"]
+    model: Provider.Model
+    force?: boolean
+  }) {
     const config = await Config.get()
-    if (config.compaction?.auto === false) return false
+    if (!input.force && config.compaction?.auto === false) return false
     const context = input.model.limit.context
     if (context === 0) return false
 

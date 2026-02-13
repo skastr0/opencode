@@ -29,6 +29,7 @@ export namespace SessionProcessor {
     sessionID: SessionID
     model: Provider.Model
     abort: AbortSignal
+    forceCompaction?: boolean
   }) {
     const toolcalls: Record<string, MessageV2.ToolPart> = {}
     let snapshot: string | undefined
@@ -311,8 +312,11 @@ export namespace SessionProcessor {
                     messageID: input.assistantMessage.parentID,
                   })
                   if (
-                    !input.assistantMessage.summary &&
-                    (await SessionCompaction.isOverflow({ tokens: usage.tokens, model: input.model }))
+                    await SessionCompaction.isOverflow({
+                      tokens: usage.tokens,
+                      model: input.model,
+                      force: input.forceCompaction,
+                    })
                   ) {
                     needsCompaction = true
                   }
@@ -387,13 +391,13 @@ export namespace SessionProcessor {
               stack: JSON.stringify(e.stack),
             })
             const error = MessageV2.fromError(e, { providerID: input.model.providerID })
-            if (MessageV2.ContextOverflowError.isInstance(error)) {
+            if (MessageV2.ContextOverflowError.isInstance(error) && input.forceCompaction) {
               needsCompaction = true
-              Bus.publish(Session.Event.Error, {
-                sessionID: input.sessionID,
-                error,
-              })
-            } else {
+            }
+            if (needsCompaction) {
+              SessionStatus.set(input.sessionID, { type: "idle" })
+            }
+            if (!needsCompaction) {
               const retry = SessionRetry.retryable(error)
               if (retry !== undefined) {
                 attempt++

@@ -543,10 +543,15 @@ export namespace SessionPrompt {
       }
 
       // context overflow, needs compaction
+      const forceCompaction = Boolean(session.parentID)
       if (
         lastFinished &&
         lastFinished.summary !== true &&
-        (await SessionCompaction.isOverflow({ tokens: lastFinished.tokens, model }))
+        (await SessionCompaction.isOverflow({
+          tokens: lastFinished.tokens,
+          model,
+          force: forceCompaction,
+        }))
       ) {
         await SessionCompaction.create({
           sessionID,
@@ -596,6 +601,7 @@ export namespace SessionPrompt {
         sessionID: sessionID,
         model,
         abort,
+        forceCompaction,
       })
       using _ = defer(() => InstructionPrompt.clear(processor.message.id))
 
