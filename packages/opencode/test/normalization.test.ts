@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 function snakeToCamel(str: string): string {
-  return str.replace(/_([a-z])/g, (_, char) => char.toUpperCase())
+  return str.replace(/_+([a-z])/g, (_, char) => char.toUpperCase())
 }
 
 function normalizeInputParams(input: Record<string, unknown>): Record<string, unknown> {

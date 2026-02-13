@@ -143,7 +143,7 @@ function normalizeToolName(name: string): string {
 // but OpenCode's tools expect camelCase (filePath, oldString, newString)
 // NOTE: Only apply this to SDK native tools, not MCP tools which already have correct naming
 function snakeToCamel(str: string): string {
-  return str.replace(/_([a-z])/g, (_, char) => char.toUpperCase())
+  return str.replace(/_+([a-z])/g, (_, char) => char.toUpperCase())
 }
 
 function normalizeInputParams(input: Record<string, unknown>): Record<string, unknown> {
