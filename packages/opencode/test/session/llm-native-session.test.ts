@@ -30,10 +30,21 @@ const setupMocks = () => {
     return { fullStream: (async function* () {})() }
   }
 
-  Provider.getLanguage = async () => ({})
-  Provider.getProvider = async () => ({ id: "claude-agent-sdk", options: {} })
+  Provider.getLanguage = async () => ({}) as Awaited<ReturnType<typeof Provider.getLanguage>>
+  Provider.getProvider = async () =>
+    ({
+      id: "claude-agent-sdk",
+      name: "Claude Agent SDK",
+      source: "custom",
+      env: [],
+      options: {},
+      models: {
+        [modelBase.id]: modelBase,
+        [modelAlt.id]: modelAlt,
+      },
+    }) as Awaited<ReturnType<typeof Provider.getProvider>>
   Config.get = async () => ({ experimental: {} })
-  Auth.get = async () => undefined
+  Auth.get = async () => ({ type: "api", key: "test" })
   Plugin.trigger = async (_event, _ctx, payload) => payload
 }
 
