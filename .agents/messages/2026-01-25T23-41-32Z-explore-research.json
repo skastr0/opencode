@@ -1,0 +1,95 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Session management mapping across OpenCode, Vercel AI SDK, Claude Agent SDK, and Task tool subagents.",
+    "data": {
+      "original_input": "OpenCode has session resumption issues; map session flow across OpenCode → Vercel AI SDK → Claude Agent SDK, including Task tool subagents.",
+      "codebase_findings": [
+        {
+          "topic": "OpenCode session store",
+          "details": "Sessions are created via Session.create/createNext with Identifier.descending('session'), stored in Storage under ['session', projectID, sessionID]. Each session tracks parentID, depth, title, permissions, and timestamps. Child sessions increment depth and reference parentID.",
+          "refs": [
+            "packages/opencode/src/session/index.ts"
+          ]
+        },
+        {
+          "topic": "Message history + session resume",
+          "details": "Messages and parts are persisted in Storage under ['message', sessionID, messageID] and ['part', messageID, partID]. Session.messages streams stored history; SessionPrompt builds prompts from stored MessageV2 history and feeds LLM.stream. There is no provider-native session dependency for most models.",
+          "refs": [
+            "packages/opencode/src/session/message-v2.ts",
+            "packages/opencode/src/session/prompt.ts",
+            "packages/opencode/src/session/llm.ts"
+          ]
+        },
+        {
+          "topic": "Vercel AI SDK (ai) expectations",
+          "details": "Vercel AI SDK uses provided message history; it does not manage sessions itself. OpenCode passes messages and providerOptions. For some providers, OpenCode sets promptCacheKey to the OpenCode sessionID, but no explicit sessionId is passed by default.",
+          "refs": [
+            "packages/opencode/src/session/llm.ts",
+            "packages/opencode/src/provider/transform.ts"
+          ]
+        },
+        {
+          "topic": "Claude Agent SDK session handling",
+          "details": "ClaudeAgentSDKLanguageModel reads providerOptions['claude-agent-sdk'].sessionId and defaults to 'default' when missing. It captures SDK session_id from system.init via translate-stream and stores it in ClaudeAgentSDKSessionStore (in-memory). Subsequent calls use sdkOptions.resume when a stored SDK session exists.",
+          "refs": [
+            "packages/opencode/src/provider/sdk/claude-agent-sdk/claude-agent-sdk-model.ts",
+            "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts",
+            "packages/opencode/src/provider/sdk/claude-agent-sdk/session-store.ts"
+          ]
+        },
+        {
+          "topic": "Claude Agent SDK tool bridge context",
+          "details": "OpenCode tools are exposed to the SDK via MCP. The tool bridge expects a valid OpenCode sessionID (ses_*) to resolve session/message context; otherwise it falls back to a minimal context. If sessionId is not passed to the SDK provider options, sessionID defaults to 'default' and tool calls are not linked to real OpenCode sessions.",
+          "refs": [
+            "packages/opencode/src/provider/sdk/claude-agent-sdk/tool-bridge.ts"
+          ]
+        },
+        {
+          "topic": "Task tool subagent sessions",
+          "details": "Task tool creates a child OpenCode session (parentID = current sessionID) unless params.session_id is provided. It returns <task_metadata> with session_id in tool output and includes sessionId in tool metadata, but there is no central storage mapping from parent session to child session. Resumption depends on the caller passing session_id explicitly.",
+          "refs": [
+            "packages/opencode/src/tool/task.ts",
+            "packages/opencode/src/session/prompt.ts"
+          ]
+        },
+        {
+          "topic": "ACP session manager",
+          "details": "ACP session state is in-memory. loadSession/newSession create or load OpenCode sessions via the SDK and replay stored messages to rebuild state. No provider-native session mapping is stored here.",
+          "refs": [
+            "packages/opencode/src/acp/agent.ts",
+            "packages/opencode/src/acp/session.ts"
+          ]
+        }
+      ],
+      "prior_art": [
+        {
+          "source": "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts",
+          "notes": "Tests show session_id is captured from system.init and stored in ClaudeAgentSDKSessionStore; store is in-memory and invalidates on model change."
+        }
+      ],
+      "patterns": [
+        "OpenCode persists session state locally and reconstructs conversation history from Storage rather than relying on provider-native session state.",
+        "Claude Agent SDK relies on its own session_id + resume token, but OpenCode only maps it in-memory and depends on providerOptions.sessionId to scope the mapping.",
+        "Task tool subagent session continuity is manual: the session_id is emitted in tool output but not auto-resumed.",
+        "Tool-bridge session tracking depends on receiving a valid OpenCode sessionID; missing providerOptions sessionId causes fallback behavior."
+      ],
+      "raw_options": [
+        "Pass OpenCode sessionID/messageID into claude-agent-sdk providerOptions to avoid default session key collisions.",
+        "Persist Claude Agent SDK session_id mapping in Storage keyed by OpenCode sessionID to survive restarts.",
+        "Automatically attach last Task subagent session_id when Task tool is called again.",
+        "Store parent→child session linkage explicitly in Session.Info or a new storage table for subagent resume.",
+        "Temporarily disable SDK resume and rely on OpenCode message history to avoid cross-session collisions.",
+        "Add diagnostics when tool-bridge receives a non-OpenCode sessionID (non ses_*), to surface mapping gaps."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:41:32Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

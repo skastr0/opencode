@@ -1,0 +1,142 @@
+{
+  "from": "review-coordinator",
+  "to": "caller",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Review of Provider Quota Widget: NEEDS WORK - Widget not using cache",
+    "data": {
+      "work_items": [
+        "quota-service.md",
+        "quota-widget.md",
+        "quota-cache.md"
+      ],
+      "overall_status": "needs-work",
+      "reviews": {
+        "code": {
+          "status": "pass",
+          "findings": [
+            {
+              "severity": "info",
+              "location": "packages/opencode/src/provider/quota.ts:17-67",
+              "category": "style",
+              "issue": "Helper functions (isRecord, stringFrom, numberFrom, etc.) are well-designed for defensive parsing",
+              "suggestion": "Consider extracting to a shared utility if reused elsewhere",
+              "blocking": false
+            },
+            {
+              "severity": "info",
+              "location": "packages/opencode/src/provider/quota.ts:240-241",
+              "category": "correctness",
+              "issue": "Reference equality check `data === entry.data` will always be false for fresh fetches since objects are different instances",
+              "suggestion": "This check is unnecessary but harmless - could be removed for clarity",
+              "blocking": false
+            }
+          ],
+          "summary": "Code quality is good. Follows project conventions (no let, no try/catch, const with early returns). Type-safe and passes typecheck."
+        },
+        "security": {
+          "status": "pass",
+          "findings": [],
+          "summary": "No security issues found. Auth tokens handled correctly via Authorization headers. No sensitive data in logs. URLs are hardcoded (no injection risk)."
+        },
+        "simplicity": {
+          "status": "warn",
+          "findings": [
+            {
+              "severity": "medium",
+              "location": "packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx:165",
+              "category": "what/how braid",
+              "issue": "Inline IIFE with imperative logic inside declarative JSX. Logic for formatting names, currencies, and deciding what text to show is braided with the rendering structure.",
+              "suggestion": "Extract to a pure functional component (e.g., `<QuotaDisplay info={quota()} providerName={...} />`) to separate the 'how' of formatting from the 'what' of the UI tree.",
+              "blocking": false
+            },
+            {
+              "severity": "medium",
+              "location": "packages/opencode/src/provider/quota.ts:14",
+              "category": "state/time braid",
+              "issue": "Module-level mutable singleton `cache` creates implicit shared state.",
+              "suggestion": "Acceptable for MVP TUI widget - would need refactoring for testability at scale.",
+              "blocking": false
+            },
+            {
+              "severity": "low",
+              "location": "packages/opencode/src/provider/quota.ts:105-220",
+              "category": "policy/mechanism braid",
+              "issue": "Provider-specific business logic is complected with HTTP fetching.",
+              "suggestion": "Consider QuotaProvider interface to separate implementations from caching layer in future.",
+              "blocking": false
+            }
+          ],
+          "summary": "Implementation works but has typical braids. UI mixes formatting with structure, data layer mixes fetching/parsing/caching. Acceptable for MVP but noted for future cleanup."
+        },
+        "requirements": {
+          "status": "fail",
+          "findings": [
+            {
+              "severity": "high",
+              "location": "packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx:97",
+              "category": "requirements-mismatch",
+              "issue": "Widget uses `ProviderQuota.fetch()` instead of `ProviderQuota.fetchCached()`. The cache implementation exists but is NOT being used, causing fresh API calls on every provider/message change.",
+              "suggestion": "Change line 97 from `ProviderQuota.fetch(provider)` to `ProviderQuota.fetchCached(provider)`",
+              "blocking": true
+            }
+          ],
+          "summary": "The cache feature (quota-cache.md work item) is implemented in the service but NOT integrated into the widget. This defeats the purpose of the 60s TTL caching requirement."
+        }
+      },
+      "blocking_issues": [
+        {
+          "severity": "high",
+          "location": "packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx:97",
+          "issue": "Widget not using fetchCached - cache implementation is unused",
+          "fix": "Change `ProviderQuota.fetch(provider)` to `ProviderQuota.fetchCached(provider)`"
+        }
+      ],
+      "suggestions": [
+        {
+          "severity": "medium",
+          "issue": "IIFE in JSX could be extracted to component",
+          "impact": "Improves readability but not blocking"
+        },
+        {
+          "severity": "low",
+          "issue": "Add error case tests for Anthropic/OpenRouter fetchers",
+          "impact": "Improves test coverage but core functionality tested"
+        }
+      ],
+      "trace_report": {
+        "original_problem": "Users need visibility into their API quota usage from the TUI sidebar",
+        "chosen_option": "Minimal sidebar widget with service abstraction",
+        "learning_milestone": "Validate quota display UX and API integration patterns",
+        "acceptance_criteria_met": [
+          "quota-service.md: PASS - ProviderQuota namespace created with fetch() for Anthropic/OpenRouter",
+          "quota-service.md: PASS - QuotaInfo type with all required fields",
+          "quota-widget.md: PASS - Widget displays in sidebar after Context section",
+          "quota-widget.md: PASS - Loading/unavailable states work correctly",
+          "quota-widget.md: PASS - Theme colors for health indicators",
+          "quota-widget.md: PASS - Reactive updates on provider/message changes",
+          "quota-cache.md: FAIL - fetchCached() implemented but NOT USED by widget",
+          "quota-cache.md: PASS - Error handling never throws, returns null",
+          "quota-cache.md: PASS - Debug logging via Log.create()"
+        ],
+        "original_intent_preserved": true,
+        "scope_creep": false
+      },
+      "tests": {
+        "status": "pass",
+        "count": 4,
+        "coverage": "Basic cache behavior tested. Error scenarios partially covered via unsupported provider test."
+      },
+      "typecheck": {
+        "status": "pass",
+        "errors": 0
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-01T22:30:00Z",
+    "work_items": ["quota-service.md", "quota-widget.md", "quota-cache.md"],
+    "parent_packet": "2026-02-01T19-45-00Z-commit-work-items.json"
+  }
+}

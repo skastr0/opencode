@@ -1,0 +1,37 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "findings",
+    "data": {
+      "findings": [
+        {
+          "id": "F-201",
+          "agent": "codex",
+          "title": "Subagent display depends on agent mode; mode=subagent is filtered from UI selector",
+          "severity": "medium",
+          "confidence": 0.72,
+          "evidence": {
+            "files": [
+              "packages/opencode/src/cli/cmd/tui/context/local.tsx:36",
+              "packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx:194"
+            ],
+            "tests": [],
+            "metrics": {}
+          },
+          "rationale": "The prompt UI uses local.agent.current() which is populated from agents where mode != 'subagent'. If a subagent is configured with mode=subagent, the UI cannot select it and will keep showing the last primary agent. If a subagent is mode=all (default when not specified), it will display correctly, explaining the intermittent behavior.",
+          "suggested_fix": "For child sessions, render the session agent directly (from last user message) or allow subagents in the local list with read-only selection.",
+          "links": []
+        }
+      ],
+      "summary": "0 critical, 0 high, 1 medium, 0 low",
+      "block_release": false
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T17:50:20Z",
+    "priority": "medium",
+    "blocking": false
+  }
+}

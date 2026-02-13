@@ -1,0 +1,161 @@
+{
+  "from": "review-coordinator",
+  "to": "caller",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Review of WI-01/02/03 (collapsible dirs, fuzzy filter, footer hints): PASS WITH SUGGESTIONS. One medium-severity logic bug (collapse-prune during filter), no blockers, no security issues. Typecheck clean.",
+    "data": {
+      "work_items": [
+        "01-collapsible-directory-nodes.md",
+        "02-fuzzy-filter-input.md",
+        "03-footer-hints-update.md"
+      ],
+      "overall_status": "pass-with-suggestions",
+      "reviews": {
+        "code": {
+          "status": "warn",
+          "findings": [
+            {
+              "severity": "medium",
+              "location": "file-list.tsx:139-158",
+              "category": "state-management",
+              "issue": "Prune effect removes collapsed keys when groups() changes due to active filtering. If user collapses dir A, filters (dir A disappears from groups), the prune effect deletes the key. When filter is cleared, dir A is unexpectedly expanded.",
+              "suggestion": "Guard the prune effect: skip pruning when filter() is non-empty. e.g. add `if (filter().length > 0) return` at the top of the effect. This preserves collapse state during filtering and only prunes after real data changes (refetch).",
+              "blocking": false
+            },
+            {
+              "severity": "low",
+              "location": "file-list.tsx:240-299",
+              "category": "reactivity",
+              "issue": "Three separate createEffects write to the `index` signal (clamp, remap-on-collapse, restore-on-filter-clear). SolidJS batches synchronous signal writes, but the execution order of effects registered at different times is not guaranteed to be stable across SolidJS versions. Currently works correctly because each effect has distinct trigger conditions.",
+              "suggestion": "Consider consolidating into a single effect or using a derived memo approach in a future cleanup pass. Not blocking because the current guard conditions (empty check, type check, snapshotId check) prevent conflicts.",
+              "blocking": false
+            },
+            {
+              "severity": "low",
+              "location": "file-list.tsx:263,302",
+              "category": "state-management",
+              "issue": "Mutable closure variables (lastSelectedId, snapshotId) are invisible to the reactive graph. They work correctly because they're only read/written within their owning effects, but they resist refactoring.",
+              "suggestion": "Could be promoted to signals for visibility, but the current approach is idiomatic for this pattern in SolidJS (local effect state). No action needed now.",
+              "blocking": false
+            },
+            {
+              "severity": "info",
+              "location": "file-list.tsx:411-425",
+              "category": "robustness",
+              "issue": "Double setTimeout for input focus (once in ref callback at line 412, once in keyboard handler at line 358). Both are 1ms. The ref callback one has an isDestroyed guard, but the keyboard handler one does not.",
+              "suggestion": "The keyboard handler setTimeout could check inputRef?.isDestroyed before calling focus(). Minor defensive improvement.",
+              "blocking": false
+            }
+          ],
+          "summary": "Implementation is correct and well-structured. The prune-during-filter bug is the only substantive issue; it's medium severity because it degrades UX (lost collapse state) but doesn't break functionality. The multi-effect index management is complex but currently safe."
+        },
+        "security": {
+          "status": "pass",
+          "findings": [],
+          "summary": "No security concerns. This is purely UI rendering code in a terminal context. No shell commands, no file writes, no eval, no prototype pollution risk from fuzzysort usage. File paths from SDK are displayed but never used as inputs to dangerous sinks."
+        },
+        "simplicity": {
+          "status": "warn",
+          "findings": [
+            {
+              "severity": "medium",
+              "location": "file-list.tsx",
+              "category": "complexity",
+              "issue": "Component grew from 275 to 536 lines with 7+ createEffects managing interrelated state. The index signal is written by 3 different effects. Local reasoning requires understanding all effects together.",
+              "suggestion": "In a future pass, extract the list-state management (filtering, collapsing, selection tracking) into a custom hook like useFileListState(). This would isolate the reactive complexity from the rendering. Not blocking for this PR because the effects are well-commented and have clear trigger guards.",
+              "blocking": false
+            },
+            {
+              "severity": "low",
+              "location": "file-list.tsx:263,302",
+              "category": "state/time-braid",
+              "issue": "lastSelectedId and snapshotId are hidden temporal state that coordinates across effect runs.",
+              "suggestion": "Acceptable for now. Would be cleaner as part of a unified selection state machine in a future refactor.",
+              "blocking": false
+            }
+          ],
+          "summary": "The component is approaching the complexity threshold where extraction would improve maintainability. The current implementation is understandable with the inline comments, but a follow-up to extract state management into a hook is recommended."
+        },
+        "requirements": {
+          "status": "pass",
+          "findings": [],
+          "summary": "All acceptance criteria for WI-01, WI-02, and WI-03 are implemented and traceable in the diff. See trace_report for details."
+        }
+      },
+      "blocking_issues": [],
+      "suggestions": [
+        {
+          "priority": 1,
+          "description": "Guard the prune effect against active filtering to preserve collapse state",
+          "location": "file-list.tsx:139",
+          "effort": "1 line change"
+        },
+        {
+          "priority": 2,
+          "description": "Add isDestroyed guard to the setTimeout in the keyboard handler (line 358)",
+          "location": "file-list.tsx:358",
+          "effort": "2 line change"
+        },
+        {
+          "priority": 3,
+          "description": "Future: extract list state management into a custom hook",
+          "location": "file-list.tsx",
+          "effort": "refactor task"
+        }
+      ],
+      "trace_report": {
+        "original_problem": "The /changes file list needs collapsible directory groups and a fuzzy filter to handle large changesets",
+        "work_items_reviewed": "WI-01, WI-02, WI-03",
+        "acceptance_criteria_met": {
+          "WI-01": [
+            "✓ Directory header rows render ▶/▼ toggle indicators and are clickable",
+            "✓ Space key on directory-header row toggles collapsed state",
+            "✓ Collapsing a directory hides child file rows from visibleRows",
+            "✓ Selection remaps to nearest visible file when collapsed away",
+            "✓ Collapse state survives navigation; keys pruned after refetch (with filter-guard caveat)",
+            "✓ Stage grouping preserved — collapse is per-directory within each stage",
+            "✓ onSelect payload shape (FileSelection) unchanged",
+            "✓ bun run typecheck passes"
+          ],
+          "WI-02": [
+            "✓ '/' hotkey activates inline filter input",
+            "✓ Typing filters via fuzzysort.go() on path",
+            "✓ Parent directory headers visible when descendants match",
+            "✓ Collapse state bypassed during active filter",
+            "✓ Escape clears filter and exits editing mode",
+            "✓ j/k/r/up/down suppressed while editing",
+            "✓ Route-level hotkeys (S, Esc) function when not in filter mode",
+            "✓ Previous selection restored when filter cleared",
+            "✓ bun run typecheck passes"
+          ],
+          "WI-03": [
+            "✓ '/ filter' hint always visible in footer",
+            "✓ 'space toggle' hint shown only when directory row selected",
+            "✓ Existing hints (esc close, ↑↓ navigate, c comment, S submit) preserved",
+            "✓ dirSelected prop threaded FileList → Changes → ChangesFooter",
+            "✓ bun run typecheck passes"
+          ]
+        },
+        "original_intent_preserved": true,
+        "scope_creep": false,
+        "regressions_detected": false,
+        "wi04_note": "WI-04 (runtime verification) is still in building/ due to environment limitations. This does NOT block the code review verdict — the code is structurally correct and type-safe. WI-04's manual verification is a separate concern that can be completed independently before merge."
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T00:00:00Z",
+    "work_items": [
+      "01-collapsible-directory-nodes.md",
+      "02-fuzzy-filter-input.md",
+      "03-footer-hints-update.md"
+    ],
+    "parent_packet": null,
+    "typecheck": "pass (0 errors)",
+    "files_changed": 3,
+    "lines_added_approx": 350,
+    "lines_removed_approx": 90
+  }
+}

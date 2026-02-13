@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Launching second parallel build wave",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Run WI-04 (diff pane) and WI-05 (footer) in parallel after WI-03 completion",
+      "rationale": "Both depend on WI-03 and are mostly orthogonal UI slices. Parallel execution reduces total cycle time before final WI-06 integration.",
+      "from_phase": "building",
+      "to_phase": "building",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:44:10Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T03-31-47Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

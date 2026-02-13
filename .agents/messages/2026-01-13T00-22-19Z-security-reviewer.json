@@ -1,0 +1,31 @@
+{
+  "from": "security-reviewer",
+  "to": "orchestrator|all",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Security review findings for git worktree path resolution changes",
+    "data": {
+      "scan_scope": {
+        "method": "git diff --merge-base origin/HEAD",
+        "files_scanned": 2,
+        "sources_identified": 4,
+        "sources_investigated": 4
+      },
+      "findings": [],
+      "summary": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "total": 0,
+        "blocking": false
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-13T00-22-19Z",
+    "work_item": null,
+    "blocking": false
+  }
+}

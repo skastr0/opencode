@@ -1,0 +1,98 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "BLOCKED: 04-runtime-verification-checklist.md (partial verification completed)",
+    "data": {
+      "work_item": "04-runtime-verification-checklist.md",
+      "files_changed": [
+        ".agents/sdlc/building/04-runtime-verification-checklist.md"
+      ],
+      "files_added": [],
+      "tests_added": [],
+      "validation_results": {
+        "tests": "partial",
+        "types": "pass",
+        "lint": "fail"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "Navigation: up/down/j/k navigate through file rows, skipping collapsed directory children",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Dir toggle: space on a directory row toggles collapse; indicator updates",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Selection stability: collapse remaps selection and updates DiffPane",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Filter activation: '/' opens inline filter and focuses input",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Filter typing: fuzzy path filtering with parent directory visibility",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Filter escape clears filter and returns to navigation mode",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Hotkey isolation while filter focused",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Comment hotkey opens prompt when allowed",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Submit flow: Shift+S submits and setComments(() => []) clears before navigation",
+          "status": "code_path_verified_runtime_pending"
+        },
+        {
+          "criterion": "Comment reset after return to /changes",
+          "status": "code_path_verified_runtime_pending"
+        },
+        {
+          "criterion": "Duplicate submit prevention on rapid second Shift+S",
+          "status": "code_path_verified_runtime_pending"
+        },
+        {
+          "criterion": "Filter + collapse combined behavior",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Refetch after collapse preserves valid collapse state",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Mouse interaction for file rows and directory headers",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Empty state text when filter matches nothing",
+          "status": "not_run"
+        },
+        {
+          "criterion": "Typecheck: bun run typecheck passes with zero errors",
+          "status": "met"
+        }
+      ],
+      "notes": "Ran root and package typechecks (pass), targeted changes-format-comments tests (pass), and lint script (fails/timeouts due unrelated tests in this environment). Attempted pseudo-TTY runtime automation for /changes via expect; app launches but deterministic full keyboard/mouse interaction is not reliably achievable here. Verified setComments duplicate/clear logic path in changes/index.tsx.",
+      "blockers": [
+        "Full acceptance verification requires direct interactive TUI execution (keyboard + mouse) in a real terminal; current environment only supports partial scripted pseudo-TTY interaction without reliable end-to-end route-level assertions."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T22:08:51Z",
+    "work_item": "04-runtime-verification-checklist.md",
+    "parent_packet": "2026-02-06T22-00-00Z-commit-plan.json",
+    "blocking": true
+  }
+}

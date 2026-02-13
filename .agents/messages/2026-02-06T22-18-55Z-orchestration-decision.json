@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Accepted reviewed code items and isolated remaining blocker to runtime verification",
+    "data": {
+      "work_item": "changes-sidebar-collapsible-filter.md",
+      "decision": "Moved WI-01/WI-02/WI-03 to done after review pass and follow-up fixes; WI-04 remains in building as an external-interaction verification blocker",
+      "rationale": "Code implementation and review gates are complete with no blocking findings. Remaining acceptance checks require live interactive TUI execution that is not reliably automatable in this environment.",
+      "from_phase": "reviewing",
+      "to_phase": "done-partial",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T22:18:55Z",
+    "work_item": "changes-sidebar-collapsible-filter.md",
+    "parent_packet": "2026-02-06T22-15-57Z-orchestration-decision.json",
+    "blocking": true
+  }
+}

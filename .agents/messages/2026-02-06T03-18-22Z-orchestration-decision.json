@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Selected pragmatic feature-complete path based on upstream PR research",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Adopt opencode#12188 route/component architecture patterns, but avoid opentui#621 dependency and source diffs from project git staged+unstaged changes",
+      "rationale": "This keeps fork conflicts minimal, preserves required UX outcomes, and avoids high maintenance risk from open opentui core changes while satisfying the user requirement of project-scoped git changes independent of session diff.",
+      "from_phase": "exploring",
+      "to_phase": "committed",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:18:22Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T03-11-11Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

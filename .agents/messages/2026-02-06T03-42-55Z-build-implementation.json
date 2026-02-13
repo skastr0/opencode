@@ -1,0 +1,83 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented Build the file list sidebar for the Changes route",
+    "data": {
+      "work_item": "03-file-list-sidebar.md",
+      "files_changed": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx",
+        ".agents/sdlc/reviewing/03-file-list-sidebar.md"
+      ],
+      "files_added": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx"
+      ],
+      "tests_added": [],
+      "validation_results": {
+        "tests": "not run (not required by acceptance criteria)",
+        "types": "pass",
+        "lint": "not run (not required by acceptance criteria)"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "FileList component created at packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx",
+          "status": "met"
+        },
+        {
+          "criterion": "Component calls sdk.client.file.status() to fetch file data on mount (and provides a refresh mechanism)",
+          "status": "met"
+        },
+        {
+          "criterion": "Files are grouped by section headers: Staged, Unstaged, Untracked",
+          "status": "met"
+        },
+        {
+          "criterion": "Within each stage section, files are displayed in directory-grouped tree/list form (directory headers + child files)",
+          "status": "met"
+        },
+        {
+          "criterion": "Each file row shows relative file path (truncated if needed), +N in green, -N in red",
+          "status": "met"
+        },
+        {
+          "criterion": "Arrow keys (up/down) navigate between files; Enter or click selects a file",
+          "status": "met"
+        },
+        {
+          "criterion": "The currently selected file is visually highlighted (background color change)",
+          "status": "met"
+        },
+        {
+          "criterion": "Empty state: when no files are changed, show No changes message",
+          "status": "met"
+        },
+        {
+          "criterion": "The Changes index component integrates FileList in a left panel (fixed width ~35-40 chars)",
+          "status": "met"
+        },
+        {
+          "criterion": "Selected file ID/path is lifted to parent via a signal/callback so the diff pane can react",
+          "status": "met"
+        },
+        {
+          "criterion": "If a file exists in both staged and unstaged sets, both entries are visible and distinguishable in the sidebar",
+          "status": "met"
+        },
+        {
+          "criterion": "bun run typecheck passes",
+          "status": "met"
+        }
+      ],
+      "notes": "Implemented stage-aware sidebar with directory headers, keyboard/mouse selection, and refresh affordance. Added stage fallback logic for SDKs without stage typing by defaulting missing stage to unstaged.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:42:55Z",
+    "work_item": "03-file-list-sidebar.md",
+    "parent_packet": "2026-02-06T12-00-00-commit-plan.json"
+  }
+}

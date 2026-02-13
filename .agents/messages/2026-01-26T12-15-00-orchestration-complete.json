@@ -1,0 +1,29 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Cleanup of obsolete AI SDK wrapper complete",
+    "data": {
+      "work_item": "cleanup-ai-sdk-wrapper.md",
+      "decision": "Work item complete, moved to done/",
+      "rationale": "All acceptance criteria met. Types pass, tests pass, 1626 lines removed.",
+      "from_phase": "building",
+      "to_phase": "done",
+      "confidence": "high",
+      "commit": "8ca26f4c1",
+      "summary_stats": {
+        "files_changed": 13,
+        "lines_removed": 1626,
+        "lines_added": 21
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T12:15:00Z",
+    "work_item": "cleanup-ai-sdk-wrapper.md",
+    "parent_packet": "2026-01-26T12-10-00-build-implementation.json",
+    "blocking": false
+  }
+}

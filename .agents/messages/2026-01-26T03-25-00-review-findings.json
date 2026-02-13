@@ -1,0 +1,81 @@
+{
+  "from": "review-coordinator",
+  "to": "caller",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Review of align-sdk-tool-names: Needs Work due to missing normalization in native stream",
+    "data": {
+      "work_item": "align-sdk-tool-names.md",
+      "overall_status": "needs-work",
+      "reviews": {
+        "code": {
+          "status": "warn",
+          "findings": [
+            {
+              "severity": "medium",
+              "location": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+              "category": "consistency",
+              "issue": "Missing tool name normalization logic (PascalCase to lowercase) present in translate-stream.ts",
+              "suggestion": "Apply SDK_TOOL_NAME_MAP normalization to native stream as well",
+              "blocking": true
+            },
+            {
+              "severity": "medium",
+              "location": "packages/opencode/test/provider/native/claude-agent-sdk.test.ts",
+              "category": "testing",
+              "issue": "Tests expect PascalCase tool names (e.g. 'Bash') instead of normalized lowercase names",
+              "suggestion": "Update tests to expect 'bash', 'read', etc. after fixing the code",
+              "blocking": true
+            }
+          ],
+          "summary": "Implementation is incomplete; native stream was missed."
+        },
+        "security": {
+          "status": "pass",
+          "findings": [],
+          "summary": "No security issues found."
+        },
+        "simplicity": {
+          "status": "pass",
+          "findings": [],
+          "summary": "Normalization logic is simple and appropriate."
+        },
+        "requirements": {
+          "status": "fail",
+          "findings": [
+            {
+              "severity": "high",
+              "category": "requirements",
+              "issue": "Inconsistent tool name normalization",
+              "suggestion": "Ensure native stream behaves identically to translate stream",
+              "blocking": true
+            }
+          ],
+          "summary": "Acceptance criteria 'Tool names are normalized consistently throughout the system' not met."
+        }
+      },
+      "blocking_issues": [
+        "Native stream (claude-agent-sdk.ts) does not normalize tool names",
+        "Native tests assert incorrect (unnormalized) behavior"
+      ],
+      "suggestions": [
+        "Consider sharing SDK_TOOL_NAME_MAP constant between translate-stream.ts and claude-agent-sdk.ts (e.g. in tool-bridge.ts)"
+      ],
+      "trace_report": {
+        "original_problem": "SDK tools (Read, Write) not using rich TUI components",
+        "acceptance_criteria_met": [
+          "x SDK native tool calls display with OpenCode's rich TUI components (Failed for native stream)",
+          "x Tool names are normalized consistently throughout the system (Failed)",
+          "✓ No breaking changes to existing tool execution",
+          "✓ mcp_opencode_task already works"
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T03:25:00Z",
+    "work_item": "align-sdk-tool-names.md",
+    "parent_packet": "2026-01-26T03-09-17Z-build-implementation.json"
+  }
+}

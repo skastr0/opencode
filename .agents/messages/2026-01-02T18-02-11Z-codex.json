@@ -1,0 +1,39 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "findings",
+    "data": {
+      "findings": [
+        {
+          "id": "F-401",
+          "agent": "codex",
+          "title": "Agent  field overrides the key and can make a subagent session display a primary agent",
+          "severity": "high",
+          "confidence": 0.66,
+          "evidence": {
+            "files": [
+              "packages/opencode/src/config/config.ts:247",
+              "packages/opencode/src/agent/agent.ts:215",
+              "packages/opencode/src/agent/agent.ts:251",
+              "packages/opencode/src/tool/task.ts:104"
+            ],
+            "tests": [],
+            "metrics": {}
+          },
+          "rationale": "If a subagent definition (frontmatter or opencode.json) includes , Agent.merge overwrites the runtime name. TaskTool uses agent.name for the subagent session, while the task UI shows params.subagent_type. This yields exactly the mismatch described: parent task says the subagent name, but the subagent session displays the overridden (primary) agent.",
+          "suggested_fix": "Remove/align the  field in subagent configs, or change TaskTool to use params.subagent_type as the session agent name instead of agent.name.",
+          "links": []
+        }
+      ],
+      "summary": "0 critical, 1 high, 0 medium, 0 low",
+      "block_release": true
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T18:02:11Z",
+    "priority": "high",
+    "blocking": true
+  }
+}

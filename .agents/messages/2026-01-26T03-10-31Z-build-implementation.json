@@ -1,0 +1,59 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented tool_use_summary completion handling for claude-agent-sdk native stream",
+    "data": {
+      "work_item": "emit-tool-result-on-tool-use-summary.md + emit-tool-error-on-tool-use-summary.md",
+      "files_changed": [
+        "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+        "packages/opencode/test/provider/native/claude-agent-sdk.test.ts",
+        ".agents/sdlc/reviewing/emit-tool-result-on-tool-use-summary.md",
+        ".agents/sdlc/reviewing/emit-tool-error-on-tool-use-summary.md"
+      ],
+      "files_added": [],
+      "tests_added": ["packages/opencode/test/provider/native/claude-agent-sdk.test.ts"],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "pass"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "Emit tool-result on tool_use_summary without summary",
+          "status": "met"
+        },
+        {
+          "criterion": "Preserve summary-based tool-result output",
+          "status": "met"
+        },
+        {
+          "criterion": "Include normalized toolName and input in tool results",
+          "status": "met"
+        },
+        {
+          "criterion": "Emit tool-error on tool_use_summary error",
+          "status": "met"
+        },
+        {
+          "criterion": "No tool-result emitted on error",
+          "status": "met"
+        },
+        {
+          "criterion": "Include toolName and input in tool errors",
+          "status": "met"
+        }
+      ],
+      "notes": "Mirrored translate-stream error parsing and default output text handling. Updated tests to mock @anthropic-ai/claude-agent-sdk directly to avoid preloaded mock resets in full-suite runs.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T03:10:31Z",
+    "work_item": "emit-tool-result-on-tool-use-summary.md",
+    "parent_packet": "2026-01-26T02-48-14Z-commit-plan.json",
+    "blocking": false
+  }
+}

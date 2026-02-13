@@ -1,0 +1,43 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "review-coordinator",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Cleanup of obsolete AI SDK wrapper for Claude Agent SDK complete",
+    "data": {
+      "work_item": "cleanup-ai-sdk-wrapper.md",
+      "changes": {
+        "moved_to_native": [
+          "tool-bridge.ts",
+          "session-store.ts",
+          "models.ts",
+          "tool-metadata-registry.ts"
+        ],
+        "deleted": [
+          "sdk/claude-agent-sdk/claude-agent-sdk-model.ts",
+          "sdk/claude-agent-sdk/index.ts",
+          "sdk/claude-agent-sdk/translate-prompt.ts",
+          "sdk/claude-agent-sdk/translate-stream.ts",
+          "test/provider/sdk/claude-agent-sdk/translate.test.ts"
+        ],
+        "modified": [
+          "provider/provider.ts - removed createClaudeAgentSDK import, removed dead getModel",
+          "session/llm.ts - updated import path for session-store",
+          "native/claude-agent-sdk.ts - updated import paths",
+          "test/provider/native/claude-agent-sdk.test.ts - updated mock path"
+        ]
+      },
+      "verification": {
+        "typecheck": "pass",
+        "tests": "11/11 pass"
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T12:10:00Z",
+    "work_item": "cleanup-ai-sdk-wrapper.md",
+    "parent_packet": "2026-01-26T12-01-00-orchestration-decision.json",
+    "blocking": false
+  }
+}

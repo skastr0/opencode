@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Started exploration for /changes sidebar enhancement",
+    "data": {
+      "work_item": "changes-sidebar-collapsible-filter.md",
+      "decision": "Route request to explore phase before committing implementation",
+      "rationale": "Multiple valid approaches exist for tree modeling, collapse state, and fuzzy matching while preserving stage grouping and keyboard behavior. Explore-first maximizes time-to-learning and reduces regression risk.",
+      "from_phase": "request",
+      "to_phase": "exploring",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T21:26:41Z",
+    "work_item": "changes-sidebar-collapsible-filter.md",
+    "parent_packet": "2026-02-06T04-15-00Z-learn-retrospective.json",
+    "blocking": false
+  }
+}

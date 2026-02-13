@@ -1,0 +1,32 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "update-report",
+    "data": {
+      "what_done": "Traced why subagent sessions can show the primary agent in the UI despite Task metadata showing the subagent name.",
+      "approach_taken": "Inspected TUI state management and prompt initialization logic tied to session changes.",
+      "challenges_faced": "The mismatch is visual/UI-level rather than in TaskTool itself, so needed to locate where the agent display is sourced.",
+      "how_solved": "Found that local agent state excludes subagents and the session-change sync tries to set a subagent name, which fails silently and leaves the primary agent active.",
+      "evidence": {
+        "files": [
+          "packages/opencode/src/cli/cmd/tui/context/local.tsx",
+          "packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx"
+        ],
+        "tests": [],
+        "metrics": {}
+      },
+      "reasoning": "UI derives the current agent from a list that filters out subagents; therefore, even when the subagent session’s last user message references a subagent, the active agent shown remains the last primary agent.",
+      "next_steps": [
+        "Decide whether to allow subagent agents in the local UI list for child sessions.",
+        "Alternatively, add a read-only subagent label in subagent sessions and keep selection limited to primary agents."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T17:43:43Z",
+    "priority": "low",
+    "blocking": false
+  }
+}

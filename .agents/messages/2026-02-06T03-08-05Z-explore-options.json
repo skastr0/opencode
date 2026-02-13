@@ -1,0 +1,53 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Provide reliable staged and unstaged git changes for the active folder/project, including file tree and hunk/line metadata, and feed that data into an existing diff-capable review UI.",
+      "constraints": [
+        "Must preserve active-directory semantics (`Instance.directory`) while optionally supporting repo-root scope (`Instance.worktree`).",
+        "Need explicit staged/unstaged separation (current APIs merge or flatten state).",
+        "Should handle large diffs and binary files without blocking UI or returning oversized payloads.",
+        "Prefer compatibility with existing unified-diff renderers already in TUI/web share surfaces."
+      ],
+      "options": [
+        {
+          "name": "Add stage-aware git review endpoint (list + lazy diff)",
+          "approach": "Introduce a dedicated server route that returns `staged` and `unstaged` file lists first (status, counts, binary flags), then fetches per-file unified diffs/hunks on demand. Back it with git porcelain + `git diff --cached` and `git diff` executed in `Instance.directory`.",
+          "time_to_learning": "4-8 hours",
+          "what_we_learn": "Whether current server/session architecture can support accurate stage separation, how much payload reduction lazy loading gives, and what hunk metadata shape the UI actually needs.",
+          "risk_if_wrong": "Medium: requires new API contract and parser decisions; may expose edge cases (renames, deletions, partially staged files).",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Fast prototype from existing APIs",
+          "approach": "Build a review panel using `/file/status` and `/file/content` only, reusing existing diff rendering components. Use it to validate UX flow quickly, accepting temporary limits (no true staged/unstaged split).",
+          "time_to_learning": "1-3 hours",
+          "what_we_learn": "UI information density needs, navigation ergonomics, and whether current `FileContent.patch` granularity is enough for reviewers.",
+          "risk_if_wrong": "High for final goal: cannot faithfully separate staged vs unstaged, and deleted/untracked behavior is incomplete.",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Server-side parse of raw git commands only",
+          "approach": "Keep transport minimal by returning parsed results from `git status --porcelain`, `git diff --cached`, and `git diff` in one call (no session/snapshot coupling), with optional repo-root mode toggle.",
+          "time_to_learning": "6-12 hours",
+          "what_we_learn": "How robust a raw-git parser is across rename/binary/submodule cases and whether a single endpoint can cover both CLI and UI consumers.",
+          "risk_if_wrong": "Medium-high: parser complexity and portability concerns; less reuse of existing File/Snapshot abstractions.",
+          "reversibility": "medium",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 first: it is the best learning-speed/accuracy balance because it satisfies staged-vs-unstaged requirements early while keeping risk controlled through list-first lazy hydration and reuse of existing diff viewers."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:08:05Z",
+    "work_item": null,
+    "parent_packet": "2026-02-06T03-08-05Z-explore-research.json"
+  }
+}

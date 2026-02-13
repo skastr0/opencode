@@ -1,0 +1,31 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented ToolMetadataRegistry retrieval in claude-agent-sdk.ts",
+    "data": {
+      "work_item": "subagent-tui-updates.md",
+      "approach": "Option 1 - Fix MCP metadata propagation",
+      "changes": [
+        {
+          "file": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+          "description": "Import ToolMetadataRegistry and retrieve stored metadata when processing tool_use_summary events",
+          "lines_changed": 12
+        }
+      ],
+      "what_it_fixes": [
+        "Task tool's ctx.metadata() calls now propagate sessionId to TUI",
+        "Summary array with tool progress is preserved",
+        "Model info is preserved",
+        "Enables child session navigation in TUI"
+      ],
+      "type_check": "passed"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T18:00:00Z",
+    "work_item": "subagent-tui-updates.md"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "work-items",
+  "content": {
+    "summary": "Work items generated from commit plan",
+    "data": {
+      "work_items": [
+        {
+          "filename": "debug-opus-bad-requests.md",
+          "title": "Instrument request logging for Opus bad requests",
+          "acceptance_criteria": [
+            "DEBUG log entry emitted before streamText includes provider/model/session/agent/variant and maxOutputTokens.",
+            "Log payload includes thinking summary and message/tool counts without prompt content or file data.",
+            "Logging is gated by DEBUG level with sensitive headers and options redacted."
+          ],
+          "dependencies": [],
+          "estimated_effort": "2 hours",
+          "order": 1
+        },
+        {
+          "filename": "debug-opus-bad-requests-error-context.md",
+          "title": "Enrich LLM error logging with provider response context",
+          "acceptance_criteria": [
+            "Stream errors log APICallError statusCode and response details when available.",
+            "Error logs include the same sanitized request metadata with variant and thinking context.",
+            "Sensitive data remains redacted in all error logs."
+          ],
+          "dependencies": [
+            "debug-opus-bad-requests.md"
+          ],
+          "estimated_effort": "2 hours",
+          "order": 2
+        },
+        {
+          "filename": "debug-opus-bad-requests-thinking-alignment.md",
+          "title": "Align agent.thinking mapping with provider variants and default budgets",
+          "acceptance_criteria": [
+            "agent.thinking defaults use ThinkingEffort budgets when budgetTokens is not provided.",
+            "Variant options remain authoritative; no changes to ProviderTransform.variants behavior.",
+            "Unit checks or assertions validate default budgets and merge order for thinking options."
+          ],
+          "dependencies": [
+            "debug-opus-bad-requests.md"
+          ],
+          "estimated_effort": "2 hours",
+          "order": 3
+        }
+      ],
+      "total_items": 3,
+      "total_estimated_effort": "6 hours"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T22:57:58Z",
+    "work_item": null,
+    "parent_packet": "2026-01-20T22-57-58Z-commit-plan.json"
+  }
+}

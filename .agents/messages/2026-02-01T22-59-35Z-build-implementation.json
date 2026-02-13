@@ -1,0 +1,45 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented quota caching and resilient quota fetching",
+    "data": {
+      "work_item": "quota-cache.md",
+      "files_changed": [
+        "packages/opencode/src/provider/quota.ts",
+        "packages/opencode/src/provider/quota.test.ts",
+        ".agents/sdlc/building/quota-cache.md"
+      ],
+      "files_added": [
+        "packages/opencode/src/log.ts"
+      ],
+      "tests_added": [
+        "packages/opencode/src/provider/quota.test.ts"
+      ],
+      "validation_results": {
+        "tests": "pass (bun test src/provider/quota.test.ts)",
+        "types": "pass (bun run typecheck)",
+        "lint": "fail (bun run lint)"
+      },
+      "acceptance_criteria_status": [
+        { "criterion": "Implement in-memory cache in ProviderQuota service", "status": "met" },
+        { "criterion": "Cache invalidation on TTL (manual refresh out of scope)", "status": "met" },
+        { "criterion": "Error handling for fetch failures with 401/403/429 handling", "status": "met" },
+        { "criterion": "Debug logging via Log.create({ service: \"provider-quota\" })", "status": "met" },
+        { "criterion": "Widget shows fallback \"--\" when service returns null", "status": "met" }
+      ],
+      "notes": "Added @/log re-export at packages/opencode/src/log.ts to satisfy required import path. fetchCached avoids resetting TTL when returning cached data from rate-limit fallback.",
+      "blockers": [
+        "bun run lint fails due to unrelated tests in test/normalization.test.ts, test/session/llm.test.ts, test/session/prompt-variant.test.ts"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-01T22:59:35Z",
+    "work_item": "quota-cache.md",
+    "parent_packet": "2026-02-01T19-45-00Z-commit-plan.json",
+    "blocking": true
+  }
+}

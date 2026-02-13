@@ -1,0 +1,33 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "update-report",
+    "data": {
+      "what_done": "Isolated a concrete code path that yields the exact UI mismatch you described between task display and subagent session agent name.",
+      "approach_taken": "Traced agent name resolution from config/frontmatter through Agent.merge into TaskTool session creation.",
+      "challenges_faced": "Needed a deterministic explanation that produces a mismatch without relying on timing or navigation artifacts.",
+      "how_solved": "Found that the optional  field in agent configs overrides the agent’s runtime name, which TaskTool uses for session creation while the task UI uses the subagent_type string.",
+      "evidence": {
+        "files": [
+          "packages/opencode/src/config/config.ts",
+          "packages/opencode/src/agent/agent.ts",
+          "packages/opencode/src/tool/task.ts"
+        ],
+        "tests": [],
+        "metrics": {}
+      },
+      "reasoning": "If any subagent has  set (intentionally or by copied frontmatter), its sessions will display that name (possibly your primary agent) even though the task display shows the requested subagent key.",
+      "next_steps": [
+        "Check the affected subagent’s frontmatter/opencode.json for a  field and remove or align it.",
+        "Optionally harden TaskTool to use params.subagent_type for session agent name to avoid config drift."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T18:02:11Z",
+    "priority": "medium",
+    "blocking": false
+  }
+}

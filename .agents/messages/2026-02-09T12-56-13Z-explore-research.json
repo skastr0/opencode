@@ -1,0 +1,97 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for intermittent provider timeout/UnknownError failures after sleep/wake",
+    "data": {
+      "original_input": "Investigate intermittent provider timeout/UnknownError failures after Mac sleep/wake, focusing on provider timeout/signal merge path around provider.ts lines ~1049-1053 and commits b24f4e3d2, ae62bc8b1, 6d3fc6365.",
+      "codebase_findings": [
+        {
+          "stage": "HTTP entrypoint",
+          "evidence": "POST /:sessionID/message calls SessionPrompt.prompt and streams JSON response",
+          "path": "packages/opencode/src/server/routes/session.ts:726"
+        },
+        {
+          "stage": "Session prompt orchestration",
+          "evidence": "prompt() creates user message then calls loop(); loop() creates/resumes per-session AbortController",
+          "path": "packages/opencode/src/session/prompt.ts:149"
+        },
+        {
+          "stage": "Cancellation source",
+          "evidence": "cancel() aborts controller and clears session loop state; /:sessionID/abort route calls it",
+          "path": "packages/opencode/src/session/prompt.ts:249"
+        },
+        {
+          "stage": "Processor pass-through",
+          "evidence": "SessionProcessor uses same AbortSignal and calls LLM.stream(streamInput)",
+          "path": "packages/opencode/src/session/processor.ts:53"
+        },
+        {
+          "stage": "Model stream call",
+          "evidence": "streamText() receives abortSignal: input.abort",
+          "path": "packages/opencode/src/session/llm.ts:363"
+        },
+        {
+          "stage": "Provider fetch wrapper",
+          "evidence": "fetch wrapper merges init.signal with AbortSignal.timeout(options.timeout) via AbortSignal.any and disables Bun timeout with timeout:false",
+          "path": "packages/opencode/src/provider/provider.ts:1044"
+        },
+        {
+          "stage": "Error normalization",
+          "evidence": "DOMException AbortError maps to MessageAbortedError; unrecognized Error objects become NamedError.Unknown",
+          "path": "packages/opencode/src/session/message-v2.ts:724"
+        },
+        {
+          "stage": "Retry behavior",
+          "evidence": "Automatic retry only occurs for retryable APIError; abort/unknown paths do not retry",
+          "path": "packages/opencode/src/session/retry.ts:87"
+        }
+      ],
+      "prior_art": [
+        {
+          "commit": "b24f4e3d2",
+          "title": "fix: timeout option",
+          "change": "Switched timeout from Bun fetch timeout option to AbortSignal.timeout + AbortSignal.any merge with existing signal; forced fetch timeout:false"
+        },
+        {
+          "commit": "ae62bc8b1",
+          "title": "fix: timeout param that allows user to disable provider timeout",
+          "change": "Added timeout !== false branch to allow disabling provider timeout while keeping signal merge"
+        },
+        {
+          "commit": "6d3fc6365",
+          "title": "core: refactor provider and model system",
+          "change": "Refactored provider/config typing; timeout schema/docs retained; no functional change in timeout fetch wrapper"
+        },
+        {
+          "commit": "51bba6e63",
+          "title": "tweak: default to disabling fetch timeout in provider options",
+          "change": "Made fetch wrapper unconditional, always sets timeout:false, and changed init handling to mutable opts object"
+        }
+      ],
+      "patterns": [
+        "Timeout logic is enforced at provider fetch layer, not in LLM/session layer.",
+        "Session abort and provider timeout are now both signal-based and merged.",
+        "Error mapping has a gap for timeout-shaped errors that are not DOMException AbortError/APICallError.",
+        "Config docs claim default 300000 ms timeout, but runtime only applies timeout when provider.options.timeout is present.",
+        "Current wrapper mutates init-derived opts.signal, unlike earlier non-mutating implementation in b24/ae."
+      ],
+      "raw_options": [
+        "Run a no-code config experiment: timeout=false vs explicit timeout, before/after sleep/wake.",
+        "Add targeted telemetry around fetch wrapper (timeout value, signal state, error class/reason).",
+        "Normalize TimeoutError/ETIMEDOUT/Abort-like errors in MessageV2.fromError for consistent retryability and UX.",
+        "Refactor provider fetch wrapper to avoid mutating init and to use clearable timeout composition.",
+        "Validate whether default timeout docs match runtime by instrumenting provider.options.timeout at request time.",
+        "Build deterministic repro script with long streaming call + forced sleep/wake window."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T12:56:13Z",
+    "work_item": null,
+    "parent_packet": null,
+    "blocking": false
+  }
+}

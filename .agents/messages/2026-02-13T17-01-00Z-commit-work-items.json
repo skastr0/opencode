@@ -1,0 +1,105 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "work-items",
+  "content": {
+    "summary": "Work items generated from Rust DAP Debugger MVP commit plan",
+    "data": {
+      "work_items": [
+        {
+          "filename": "01-dap-client-transport.md",
+          "title": "DAP client: content-length transport + request/response/event dispatch",
+          "acceptance_criteria": [
+            "Content-length framing encodes and decodes DAP JSON-RPC messages over stdin/stdout",
+            "Request/response correlation via seq ID with timeout",
+            "Event listeners can be registered and receive typed events",
+            "Unit tests pass for framing round-trip and request/response matching"
+          ],
+          "dependencies": [],
+          "estimated_effort": "6-8 hours",
+          "order": 1
+        },
+        {
+          "filename": "02-dap-session-manager.md",
+          "title": "DAP session manager: Instance.state lifecycle + codelldb spawn/shutdown",
+          "acceptance_criteria": [
+            "Instance.state holds at most one active DAP session per OpenCode instance",
+            "codelldb process is spawned with correct args and env",
+            "Bus events emitted for session created/terminated",
+            "Dispose handler kills codelldb process on Instance shutdown",
+            "State machine enforces valid transitions"
+          ],
+          "dependencies": ["01-dap-client-transport.md"],
+          "estimated_effort": "6-8 hours",
+          "order": 2
+        },
+        {
+          "filename": "03-debug-launch-tool.md",
+          "title": "debug_launch tool: initialize handshake + launch program under codelldb",
+          "acceptance_criteria": [
+            "Tool.define debug_launch with Zod schema for program path and optional args",
+            "Executes initialize → launch → configurationDone handshake sequence",
+            "Returns session status including adapter capabilities",
+            "Permission ask for debug_launch before spawning",
+            "Clear error if codelldb not found or handshake fails"
+          ],
+          "dependencies": ["02-dap-session-manager.md"],
+          "estimated_effort": "6-8 hours",
+          "order": 3
+        },
+        {
+          "filename": "04-debug-breakpoint-tool.md",
+          "title": "debug_breakpoint tool: set/clear breakpoints via DAP setBreakpoints",
+          "acceptance_criteria": [
+            "Tool.define debug_breakpoint with Zod schema for file path and line numbers",
+            "Sends setBreakpoints request and returns confirmed breakpoint locations",
+            "Handles breakpoint verification (verified: true/false)",
+            "Permission ask for debug_breakpoint",
+            "Error if no active debug session"
+          ],
+          "dependencies": ["03-debug-launch-tool.md"],
+          "estimated_effort": "4-6 hours",
+          "order": 4
+        },
+        {
+          "filename": "05-debug-eval-tool.md",
+          "title": "debug_eval tool: evaluate expressions + inspect variables + continue execution",
+          "acceptance_criteria": [
+            "Tool.define debug_eval with Zod schema for expression, optional frameId, and action (evaluate/variables/continue/next/stepIn)",
+            "Auto-resolves threadId and frameId from cached stopped event when not provided",
+            "Evaluate returns result string; variables returns scoped variable list",
+            "Continue/next/stepIn resume execution; tool returns new stopped location or terminated status",
+            "Output truncated via Truncate.output for large results",
+            "Permission ask for debug_eval"
+          ],
+          "dependencies": ["04-debug-breakpoint-tool.md"],
+          "estimated_effort": "8-10 hours",
+          "order": 5
+        },
+        {
+          "filename": "06-feature-flag-config-registry.md",
+          "title": "Feature flag, config schema, and tool registry wiring",
+          "acceptance_criteria": [
+            "OPENCODE_EXPERIMENTAL_DAP flag added to flag.ts",
+            "Debug tools conditionally registered in registry.ts when flag is true",
+            "Config schema accepts optional dap section with codelldb path",
+            "Permission schema includes debug_launch, debug_breakpoint, debug_eval",
+            "Feature is completely inert when flag is false (no imports, no side effects)"
+          ],
+          "dependencies": [],
+          "estimated_effort": "3-4 hours",
+          "order": 1
+        }
+      ],
+      "total_items": 6,
+      "total_estimated_effort": "33-44 hours",
+      "dependency_graph": "06 and 01 can be built in parallel (no deps) → 02 depends on 01 → 03 depends on 02 → 04 depends on 03 → 05 depends on 04. Item 06 should be done early as it gates integration testing."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-13T17:01:00Z",
+    "work_item": "rust-dap-debugger-plugin-research.md",
+    "parent_packet": "2026-02-13T17-00-00Z-commit-plan.json"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Expose OpenCode tools (built-ins, plugin tools, MCP tools) to Claude Agent SDK with correct schema, metadata, and execution wiring.",
+      "constraints": [
+        "Explore phase only: no implementation or work items.",
+        "Reuse existing tool registry and MCP integration where possible.",
+        "Preserve permissions + plugin hooks around tool execution.",
+        "Tool schemas must be compatible with Claude Agent SDK tool format.",
+        "Tool outputs may need truncation and attachments handling."
+      ],
+      "options": [
+        {
+          "name": "Adapter-only tool catalog",
+          "approach": "Create an adapter that transforms ToolRegistry.tools() and MCP.tools() outputs into Claude Agent SDK tool schema (name/description/input_schema). Reuse current execute wrappers from SessionPrompt.resolveTools for execution calls.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Schema compatibility gaps, which metadata fields Claude requires, and how MCP tool outputs map to Claude tool results.",
+          "risk_if_wrong": "May miss execution context or permission flows needed outside SessionPrompt.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Server endpoints for tool list + execute",
+          "approach": "Add an API that returns the tool catalog and provides a tool execution endpoint using the same Tool.Context and Plugin hooks as SessionPrompt. Claude SDK calls the API instead of direct in-process tool execution.",
+          "time_to_learning": "0.5-1 day",
+          "what_we_learn": "End-to-end exposure model (auth/permissions, execution results) and how external clients integrate with tools.",
+          "risk_if_wrong": "More surface area and potential auth complexity if the SDK runs outside opencode runtime.",
+          "reversibility": "medium",
+          "rank": 2
+        },
+        {
+          "name": "MCP-first standardization",
+          "approach": "Expose internal tools as MCP tools (local server), then consume MCP tools in Claude Agent SDK. Make MCP the single tool contract boundary.",
+          "time_to_learning": "1-2 days",
+          "what_we_learn": "Standard MCP tool schema compatibility and whether MCP is a stable cross-SDK tool boundary.",
+          "risk_if_wrong": "Larger architecture shift and more moving parts (MCP client/server management).",
+          "reversibility": "low",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it reuses the current tool registry and execution wiring with the smallest surface area, giving the fastest feedback on schema and metadata compatibility."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T12:00:00Z",
+    "work_item": null,
+    "parent_packet": "2026-01-25T12-00-00-explore-research.json"
+  }
+}

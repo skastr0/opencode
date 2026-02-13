@@ -1,0 +1,76 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: Claude Agent SDK native API (streaming, tools, sessions, MCP)",
+    "data": {
+      "original_input": "Exploration: Claude Agent SDK Native API. Document SDK entry points, streaming event/message format, tool_use/tool_result protocol, session management (session_id/resume/turns), MCP integration; focus on native SDK without Vercel AI SDK.",
+      "codebase_findings": [
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/claude-agent-sdk-model.ts",
+          "notes": "Direct SDK entry point is query() from @anthropic-ai/claude-agent-sdk. Input: { prompt, options }. Options used here: model, includePartialMessages, permissionMode, settingSources, workingDirectory, disallowedTools, mcpServers, resume, maxThinkingTokens. Session ID captured from system.init via stream transformer and stored; resume uses stored SDK session id."
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-prompt.ts",
+          "notes": "Native prompt format is string or AsyncIterable of SDKInputMessage. SDKInputMessage supports type: 'user' with message { role: 'user', content: string | parts }, and type: 'tool_result' with tool_use_id + content (string). Content parts include text, image, document with source { type: 'base64' | 'url' }."
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts",
+          "notes": "Streaming events observed: type=system (subtype=init, session_id/sessionId), partial (delta/text), assistant (message.content blocks: text, tool_use, thinking), tool_progress (tool_use_id, tool_name, elapsed_time_seconds), tool_use_summary (summary, preceding_tool_use_ids/tool_use_id), error. These are mapped into AI SDK stream parts (text/reasoning/tool-call/tool-result/finish)."
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/tool-bridge.ts",
+          "notes": "Native MCP integration uses createSdkMcpServer and SdkMcpToolDefinition from the SDK. Tools are registered with inputSchema (Zod shape) and handler returning MCP CallToolResult. OpenCode builds an in-process MCP server and passes it via options.mcpServers."
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/session-store.ts",
+          "notes": "Session store maps OpenCode session key to SDK session_id per model; resume uses stored ID. Session key is taken from providerOptions['claude-agent-sdk'].sessionId; defaults to 'default'."
+        },
+        {
+          "path": "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts",
+          "notes": "Tests confirm system.init -> session_id, assistant text -> text parts, tool_use -> tool-call, tool_progress -> tool-call, tool_use_summary -> tool-result, partial -> text-delta, error -> error. Also checks cache usage mapping from usage payload in assistant message."
+        }
+      ],
+      "prior_art": [
+        {
+          "source": "https://platform.claude.com/docs/en/agent-sdk/streaming-vs-single-mode",
+          "notes": "query() is primary TypeScript entry point. prompt can be a string (single message) or an async generator of user messages (streaming input). For await over query() yields message objects; result messages use type 'result'."
+        },
+        {
+          "source": "https://platform.claude.com/docs/en/agent-sdk/sessions",
+          "notes": "session_id delivered in system init message. Resume via options.resume. forkSession can create a new session id from a resume point."
+        },
+        {
+          "source": "https://platform.claude.com/docs/en/agent-sdk/mcp",
+          "notes": "MCP servers configured via options.mcpServers. Tools are gated by allowedTools or permissionMode. system init message includes mcp_servers connection status. Tool naming convention for external MCP: mcp__<server>__<tool>."
+        },
+        {
+          "source": "https://docs.anthropic.com/en/docs/claude-code/sdk/custom-tools",
+          "notes": "Custom tools in SDK use createSdkMcpServer to expose tools in-process." 
+        }
+      ],
+      "patterns": [
+        "SDK streaming output is message-typed objects; system.init carries session_id and MCP status.",
+        "Assistant content is block-based: text, tool_use, thinking. tool_use includes id, name, input object.",
+        "Tool results are passed as separate input messages (type: tool_result) tied to tool_use_id before the next user message.",
+        "Session resumption uses options.resume with session_id; optional forkSession in docs for branching.",
+        "MCP can be in-process (createSdkMcpServer) or external via mcpServers; allowedTools or permissionMode governs tool access."
+      ],
+      "raw_options": [
+        "Log raw SDK query() messages in a small local script to confirm actual message types and fields.",
+        "Swap Vercel AI SDK wrapper for direct query() while keeping existing translate-prompt/translate-stream mappings.",
+        "Adopt streaming-input mode with async generator for multi-turn interactions and richer session handling.",
+        "Implement full session resume/fork in provider options and expose to callers.",
+        "Use createSdkMcpServer for OpenCode tools plus allow external MCP servers via config.",
+        "Map SDK result messages (type: result, subtype) into OpenCode completion events if present in real streams."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:39:29Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

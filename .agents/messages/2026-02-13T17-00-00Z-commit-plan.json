@@ -1,0 +1,107 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "plan",
+  "content": {
+    "summary": "Implementation plan for: Rust DAP Debugger Plugin MVP (codelldb-only, no adapter abstraction)",
+    "data": {
+      "goal": "Add a debug adapter protocol (DAP) client to OpenCode that spawns and manages codelldb for Rust projects, exposed as a set of LLM-callable tools behind a feature flag, following the long-lived server/map/cache/queue pattern established by LSP and PTY subsystems.",
+      "learning_milestone": "An LLM agent can set a breakpoint in a Rust binary, launch it under codelldb, hit the breakpoint, inspect one local variable, and continue — all within a single OpenCode chat session, end-to-end, with no manual intervention beyond initial codelldb installation.",
+      "approach": "We build a new `src/dap/` module that owns the lifecycle of exactly one codelldb debug session per OpenCode instance. The module follows the same `Instance.state()` / namespace / Bus event pattern used by `src/lsp/` and `src/pty/`. A thin DAP client speaks JSON-RPC over stdin/stdout to the codelldb process using content-length framing (identical to LSP). Three tools (`debug_launch`, `debug_breakpoint`, `debug_eval`) expose the minimum surface area to the LLM. The entire feature is gated behind `OPENCODE_EXPERIMENTAL_DAP` flag and a `dap` permission. No adapter registry, no multi-adapter abstraction — codelldb is hardcoded as the sole adapter for the MVP.",
+      "changes_required": [
+        {"file": "packages/opencode/src/dap/client.ts", "change": "New file: DAP JSON-RPC client over stdin/stdout with content-length framing, initialize/launch/configurationDone handshake, request/response/event dispatch"},
+        {"file": "packages/opencode/src/dap/index.ts", "change": "New file: DAP session manager — Instance.state() holding active session, codelldb spawn/shutdown, Bus events for session lifecycle"},
+        {"file": "packages/opencode/src/tool/debug_launch.ts", "change": "New file: Tool.define 'debug_launch' — spawns codelldb, runs initialize+launch+configurationDone, returns session status"},
+        {"file": "packages/opencode/src/tool/debug_breakpoint.ts", "change": "New file: Tool.define 'debug_breakpoint' — sets breakpoints via setBreakpoints request, returns confirmed locations"},
+        {"file": "packages/opencode/src/tool/debug_eval.ts", "change": "New file: Tool.define 'debug_eval' — evaluates expressions in stopped frame, reads variables, continues execution"},
+        {"file": "packages/opencode/src/flag/flag.ts", "change": "Add OPENCODE_EXPERIMENTAL_DAP flag"},
+        {"file": "packages/opencode/src/tool/registry.ts", "change": "Conditionally register debug tools when OPENCODE_EXPERIMENTAL_DAP is true"},
+        {"file": "packages/opencode/src/config/config.ts", "change": "Add 'dap' to Permission schema keys, add optional dap config section for codelldb path override"},
+        {"file": "packages/opencode/src/permission/next.ts", "change": "No structural change needed — dap tools use existing permission.ask() with 'debug_launch'/'debug_breakpoint'/'debug_eval' permissions"}
+      ],
+      "challenges": {
+        "technical": [
+          {
+            "challenge": "DAP content-length framing is identical to LSP but must be implemented independently (or extracted)",
+            "why_hard": "LSP client uses vscode-jsonrpc which bundles framing; DAP has no equivalent maintained npm library for raw stdio transport",
+            "mitigation": "Implement minimal content-length reader/writer (~50 lines) directly in dap/client.ts; the protocol is trivial. Can later extract shared framing if needed."
+          },
+          {
+            "challenge": "codelldb initialization handshake has strict sequencing requirements",
+            "why_hard": "Must send initialize, wait for response, send launch (with correct program path), wait for initialized event, then configurationDone — misordering causes silent hangs",
+            "mitigation": "Implement as explicit state machine: 'uninitialized' → 'initializing' → 'running' → 'stopped' → 'terminated'. Each tool asserts expected state before acting."
+          },
+          {
+            "challenge": "Stopped thread/frame context must be tracked for variable evaluation",
+            "why_hard": "DAP stopped events carry threadId; stackTrace request returns frameId; evaluate requires frameId — this is a three-step chain the LLM must not have to manage",
+            "mitigation": "DAP client auto-captures stopped event data (threadId, reason) and auto-fetches top frame on stop. Tools read cached frame context."
+          },
+          {
+            "challenge": "codelldb binary discovery and platform differences",
+            "why_hard": "codelldb ships as a VS Code extension with platform-specific binaries; path varies by installation method",
+            "mitigation": "MVP: require user to set codelldb path in config or PATH. No auto-download. Clear error message if not found."
+          }
+        ],
+        "resourcing": {
+          "estimated_effort": "30-50 hours across 2-4 weeks",
+          "dependencies": [
+            "codelldb must be installed on the developer's machine",
+            "A Rust project with a compiled binary must exist for testing",
+            "No external npm packages required for DAP — raw stdio + content-length framing"
+          ],
+          "skills_required": [
+            "DAP protocol JSON-RPC message format",
+            "Content-length framing (same as LSP)",
+            "OpenCode Instance.state / Bus / Tool.define patterns",
+            "child_process stdin/stdout management"
+          ],
+          "risk_factors": [
+            "codelldb may have undocumented quirks in its DAP implementation that only surface during integration",
+            "Stopped-state race conditions: events arriving before response handlers are registered",
+            "Output truncation: debug variable values can be very large (deep structs, long vectors)"
+          ]
+        },
+        "open_questions": [
+          "Should we kill the codelldb process on session end, or let it persist across chat sessions within the same OpenCode instance?",
+          "How should we handle multiple stopped threads (e.g., multi-threaded Rust programs)? MVP proposal: always use first stopped thread.",
+          "Should debug output (program stdout/stderr) be captured and returned to the LLM, or only DAP protocol responses?",
+          "What is the maximum safe size for variable inspection results before truncation kicks in?"
+        ]
+      },
+      "testing_strategy": {
+        "unit": [
+          "Content-length framing: round-trip encode/decode with various payload sizes",
+          "State machine transitions: verify illegal transitions throw, legal transitions update state",
+          "Request/response matching: verify seq-based correlation works with interleaved events",
+          "Config parsing: verify dap config section parses correctly with and without codelldb path"
+        ],
+        "integration": [
+          "Full handshake test against real codelldb (requires codelldb installed, guarded by env var)",
+          "Set breakpoint + launch + hit breakpoint + evaluate variable + continue + terminate flow",
+          "Error paths: missing codelldb binary, invalid program path, evaluate in non-stopped state",
+          "Tool permission: verify debug tools respect deny/ask/allow rules"
+        ]
+      },
+      "risks": [
+        {"risk": "codelldb may not be widely installed, limiting who can test", "mitigation": "Clear setup docs in work items; CI can skip integration tests via env guard"},
+        {"risk": "DAP protocol version mismatch between our client and codelldb", "mitigation": "Pin to DAP spec 1.x; codelldb has been stable on 1.x for years"},
+        {"risk": "Large variable inspection output blows up LLM context", "mitigation": "Apply existing Truncate.output() to all debug tool responses; add depth-limiting for nested structs"},
+        {"risk": "Session cleanup on crash/abort", "mitigation": "Instance.state dispose handler kills codelldb process; same pattern as LSP client shutdown"}
+      ],
+      "work_items": [
+        "01-dap-client-transport.md",
+        "02-dap-session-manager.md",
+        "03-debug-launch-tool.md",
+        "04-debug-breakpoint-tool.md",
+        "05-debug-eval-tool.md",
+        "06-feature-flag-config-registry.md"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-13T17:00:00Z",
+    "work_item": "rust-dap-debugger-plugin-research.md",
+    "parent_packet": "2026-02-13T12-41-07Z-orchestration-orchestrator-engineer.json"
+  }
+}

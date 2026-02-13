@@ -1,0 +1,85 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: OpenCode Task tool and subagent architecture",
+    "data": {
+      "original_input": "Analyze how OpenCode's Task tool and subagent system works to understand what we need to expose to Claude Agent SDK.",
+      "codebase_findings": [
+        {
+          "topic": "Task tool schema and execution",
+          "details": "Task tool defines parameters (description, prompt, subagent_type, optional session_id, optional command), checks permissions (unless bypassAgentCheck), resolves agent, creates or reuses a child Session (parentID=caller session), determines model, streams metadata updates via Bus PartUpdated, runs SessionPrompt.prompt in subagent session, collects tool summary and last text part, and returns output with a <task_metadata> session_id footer.",
+          "refs": [
+            "packages/opencode/src/tool/task.ts",
+            "packages/opencode/src/tool/task.txt"
+          ]
+        },
+        {
+          "topic": "Subagent availability",
+          "details": "Task tool lists agents via Agent.list() and filters out mode=primary; availability is permission-gated for caller. Built-in subagents include general and explore. Custom agents come from config markdown files and default to mode=all unless specified; mode=primary agents (triage, duplicate-pr) are excluded.",
+          "refs": [
+            "packages/opencode/src/agent/agent.ts",
+            "packages/opencode/src/tool/task.ts"
+          ]
+        },
+        {
+          "topic": "Agent config structure",
+          "details": "Agent configs load from markdown in {agent,agents}/**/*.md under config directories (.opencode dirs, global config). Frontmatter fields include model, temperature, top_p, prompt, description, mode, hidden, color, steps, thinking, permission, disable; legacy tools map to permissions; unknown keys are moved into options.",
+          "refs": [
+            "packages/opencode/src/config/config.ts",
+            "packages/opencode/src/agent/agent.ts",
+            ".opencode/agent/docs.md",
+            ".opencode/agent/triage.md",
+            ".opencode/agent/duplicate-pr.md"
+          ]
+        },
+        {
+          "topic": "Session tracking and nesting",
+          "details": "Sessions store parentID and depth; createNext computes depth from parent. Task tool creates child sessions with restricted permissions. Session.messages streams MessageV2 and is used by Task tool to build tool summary. SessionPrompt loop handles subtask parts by calling TaskTool.execute and updating tool part status/output in MessageV2.",
+          "refs": [
+            "packages/opencode/src/session/index.ts",
+            "packages/opencode/src/session/prompt.ts",
+            "packages/opencode/src/session/message-v2.ts"
+          ]
+        },
+        {
+          "topic": "Delegation depth",
+          "details": "Task tool enforces config.experimental.max_delegation_depth via session.depth to allow/deny nested task calls; if depth exceeds max or agent lacks task permission, Task tool is disabled for the subagent session.",
+          "refs": [
+            "packages/opencode/src/tool/task.ts"
+          ]
+        },
+        {
+          "topic": "Agent list API",
+          "details": "Server exposes GET /agent returning Agent.Info array; can be used by SDK to list agents and their modes/permissions.",
+          "refs": [
+            "packages/opencode/src/server/server.ts"
+          ]
+        }
+      ],
+      "prior_art": [],
+      "patterns": [
+        "Agents are dynamic: built-ins + config markdown (frontmatter + body prompt).",
+        "Subagent sessions are child sessions with parentID, depth, and restricted tool permissions.",
+        "Task output embeds a session_id footer to enable continuation.",
+        "Progress is surfaced via MessageV2 tool parts and Bus PartUpdated events.",
+        "Delegation depth is enforced by config.experimental.max_delegation_depth."
+      ],
+      "raw_options": [
+        "Document the Task tool schema and output contract for SDK mapping (fast).",
+        "Enumerate runtime agent list via /agent endpoint and map mode!=primary to subagent list.",
+        "Prototype a Task run to validate session_id continuation and output parsing.",
+        "Map agent config frontmatter to SDK fields (model, permissions, steps, hidden).",
+        "Surface task progress summary by consuming tool part updates (MessageV2 PartUpdated).",
+        "Add optional delegation depth signaling in SDK (max_delegation_depth awareness)."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T21-01-17Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

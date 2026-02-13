@@ -1,0 +1,153 @@
+{
+  "from": "review-coordinator",
+  "to": "caller",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Review of Provider Quota Widget: PASS - All acceptance criteria met",
+    "data": {
+      "work_items": [
+        "quota-service.md",
+        "quota-widget.md",
+        "quota-cache.md"
+      ],
+      "overall_status": "pass",
+      "reviews": {
+        "code": {
+          "status": "pass",
+          "findings": [
+            {
+              "severity": "info",
+              "location": "packages/opencode/src/provider/quota.ts:17-67",
+              "category": "design",
+              "issue": "Helper functions (isRecord, stringFrom, numberFrom, dateFrom, percentFrom) provide defensive parsing",
+              "suggestion": "Well-designed pattern - consider extracting to shared utility if reused elsewhere",
+              "blocking": false
+            },
+            {
+              "severity": "info",
+              "location": "packages/opencode/src/provider/quota.ts:240-241",
+              "category": "correctness",
+              "issue": "Reference equality check `data === entry.data` will always be false for fresh fetches",
+              "suggestion": "Harmless but could be removed for clarity",
+              "blocking": false
+            },
+            {
+              "severity": "info",
+              "location": "packages/opencode/src/provider/quota.ts:14",
+              "category": "style",
+              "issue": "Module-level cache Map follows project singleton patterns",
+              "suggestion": "Acceptable for TUI widget scope",
+              "blocking": false
+            }
+          ],
+          "summary": "Code quality is excellent. Follows all project conventions: no let, no try/catch, const with early returns, type-safe (no any). Passes typecheck."
+        },
+        "security": {
+          "status": "pass",
+          "findings": [],
+          "summary": "No security issues. Auth tokens handled correctly via Authorization headers. No sensitive data in logs (only providerID, status, url). Hardcoded URLs prevent injection."
+        },
+        "simplicity": {
+          "status": "warn",
+          "findings": [
+            {
+              "severity": "medium",
+              "location": "packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx:165-190",
+              "category": "what/how braid",
+              "issue": "Inline IIFE with formatting logic inside declarative JSX",
+              "suggestion": "Could extract to <QuotaDisplay info={...} /> component for separation of concerns",
+              "blocking": false
+            },
+            {
+              "severity": "low",
+              "location": "packages/opencode/src/provider/quota.ts:14",
+              "category": "state/time braid",
+              "issue": "Module-level mutable cache singleton creates implicit shared state",
+              "suggestion": "Acceptable for MVP TUI widget - would need refactoring for testability at scale",
+              "blocking": false
+            },
+            {
+              "severity": "low",
+              "location": "packages/opencode/src/provider/quota.ts:105-220",
+              "category": "policy/mechanism braid",
+              "issue": "Provider-specific business logic is complected with HTTP fetching",
+              "suggestion": "Consider QuotaProvider interface in future to separate implementations from caching layer",
+              "blocking": false
+            }
+          ],
+          "summary": "Implementation has typical MVP braids. UI mixes formatting with structure, data layer mixes fetching/parsing/caching. All non-blocking and acceptable for initial implementation."
+        },
+        "requirements": {
+          "status": "pass",
+          "findings": [],
+          "summary": "All acceptance criteria from all three work items are met. The previous blocking issue (widget not using fetchCached) has been fixed."
+        }
+      },
+      "blocking_issues": [],
+      "suggestions": [
+        {
+          "severity": "medium",
+          "issue": "IIFE in JSX (sidebar.tsx:165-190) could be extracted to component",
+          "impact": "Improves readability and testability but not blocking"
+        },
+        {
+          "severity": "low",
+          "issue": "Add more error case tests for Anthropic/OpenRouter fetchers",
+          "impact": "Improves test coverage but core functionality is tested"
+        },
+        {
+          "severity": "info",
+          "issue": "Remove unnecessary reference equality check in fetchCached (line 241)",
+          "impact": "Minor clarity improvement"
+        }
+      ],
+      "trace_report": {
+        "original_problem": "Users need visibility into their API quota usage from the TUI sidebar",
+        "chosen_option": "Minimal sidebar widget with service abstraction (from commit plan)",
+        "learning_milestone": "Validate quota display UX and API integration patterns",
+        "acceptance_criteria_met": [
+          "quota-service.md: ProviderQuota namespace created with fetch() for Anthropic/OpenRouter",
+          "quota-service.md: QuotaInfo type with all required fields (type, remaining, resetsAt, weeklyUsed, weeklyLimit, totalCredits)",
+          "quota-service.md: Returns null for unsupported providers without throwing",
+          "quota-service.md: Uses existing Auth.get() for tokens correctly",
+          "quota-widget.md: Widget displays usage percentage with provider name",
+          "quota-widget.md: Widget displays reset time with relative formatting (Xh Ym)",
+          "quota-widget.md: Widget displays weekly cost for pay-as-you-go providers",
+          "quota-widget.md: Integrated after Context section in sidebar",
+          "quota-widget.md: Uses theme system (success/warning/error colors based on remaining %)",
+          "quota-widget.md: Reactively updates on provider/message changes (via on() tracking)",
+          "quota-widget.md: Shows '...' during loading, '--' when unavailable",
+          "quota-cache.md: In-memory cache with 60s TTL implemented (Map + TTL constant)",
+          "quota-cache.md: fetchCached() returns cached data if within TTL",
+          "quota-cache.md: Cache hit/miss logging via Log.create({ service: 'provider-quota' })",
+          "quota-cache.md: Error handling never throws - uses .catch(() => null) pattern",
+          "quota-cache.md: Rate limit (429) returns cached fallback data"
+        ],
+        "original_intent_preserved": true,
+        "scope_creep": false
+      },
+      "tests": {
+        "status": "pass",
+        "count": 4,
+        "details": [
+          "quota module exports ProviderQuota and QuotaInfo",
+          "fetch returns null for unsupported provider",
+          "fetchCached caches within TTL",
+          "fetchCached refetches after TTL"
+        ],
+        "coverage": "Core cache behavior tested. Edge cases for unsupported providers covered. Could add more error scenario tests."
+      },
+      "typecheck": {
+        "status": "pass",
+        "errors": 0
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-01T23:20:51Z",
+    "work_items": ["quota-service.md", "quota-widget.md", "quota-cache.md"],
+    "parent_packet": "2026-02-01T22-59-35Z-build-implementation.json",
+    "blocking": false
+  }
+}

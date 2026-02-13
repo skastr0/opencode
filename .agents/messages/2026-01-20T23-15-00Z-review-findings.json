@@ -1,0 +1,64 @@
+{
+  "from": "review-coordinator",
+  "to": "caller",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Review of debug-opus-bad-requests: PASS. Sanitized logging implemented and thinking budgets clamped to provider limits.",
+    "data": {
+      "work_item": "debug-opus-bad-requests.md",
+      "overall_status": "pass",
+      "reviews": {
+        "code": {
+          "status": "pass",
+          "findings": [],
+          "summary": "Clean implementation of pure log helper. Removal of pattern-based thinking detection simplifies logic and prevents invalid budgets."
+        },
+        "security": {
+          "status": "pass",
+          "findings": [],
+          "summary": "Redaction verified. Auth headers, prompt text, and file contents are excluded from debug logs."
+        },
+        "simplicity": {
+          "status": "pass",
+          "findings": [],
+          "summary": "Reduced complexity by removing 'magic word' pattern detection. Log helper is pure and testable."
+        },
+        "requirements": {
+          "status": "pass",
+          "findings": [
+            {
+              "severity": "info",
+              "location": "packages/opencode/src/session/thinking-effort.ts",
+              "category": "scope",
+              "issue": "Removed pattern detection for thinking",
+              "suggestion": "Document that 'think hard' no longer auto-activates thinking mode",
+              "blocking": false
+            }
+          ],
+          "summary": "All logging criteria met. Budget clamping addresses the root cause of bad requests."
+        }
+      },
+      "blocking_issues": [],
+      "suggestions": [],
+      "trace_report": {
+        "original_problem": "Opus bad requests (400) needed diagnosis",
+        "chosen_option": "Instrument request logging and align budgets",
+        "learning_milestone": "Failed requests yield diagnostic logs",
+        "acceptance_criteria_met": [
+          "✓ A DEBUG log entry emitted before streamText",
+          "✓ Log payload includes thinking summary and message/tool counts",
+          "✓ Variant selection is logged without changing merge order",
+          "✓ Logging is gated by DEBUG level"
+        ],
+        "original_intent_preserved": true,
+        "scope_creep": false
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T23:15:00Z",
+    "work_item": "debug-opus-bad-requests.md",
+    "parent_packet": "2026-01-20T23:08-34Z-build-implementation.json"
+  }
+}

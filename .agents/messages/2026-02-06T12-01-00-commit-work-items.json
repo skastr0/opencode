@@ -1,0 +1,104 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "work-items",
+  "content": {
+    "summary": "Work items generated from git review UI commit plan",
+    "data": {
+      "work_items": [
+        {
+          "filename": "01-file-status-staged-unstaged.md",
+          "title": "Enrich File.status() to separate staged vs unstaged changes",
+          "acceptance_criteria": [
+            "File.Info schema has optional stage field (staged/unstaged/untracked)",
+            "File.status() runs git diff --cached and git diff separately",
+            "Duplicate files appear as two entries with distinct stage values",
+            "SDK regenerated and typecheck passes"
+          ],
+          "dependencies": [],
+          "estimated_effort": "1.5 hours",
+          "order": 1
+        },
+        {
+          "filename": "02-changes-route-scaffold.md",
+          "title": "Scaffold the /changes route and command registration",
+          "acceptance_criteria": [
+            "ChangesRoute type added to Route union",
+            "App renders Changes component for changes route",
+            "/changes slash command registered and navigates correctly",
+            "Escape navigates back to returnTo route",
+            "Typecheck passes"
+          ],
+          "dependencies": [],
+          "estimated_effort": "1 hour",
+          "order": 1
+        },
+        {
+          "filename": "03-file-list-sidebar.md",
+          "title": "Build the file list sidebar for the Changes route",
+          "acceptance_criteria": [
+            "FileList component fetches and displays changed files",
+            "Files grouped by Staged/Unstaged/Untracked sections",
+            "Keyboard navigation (up/down/enter) and visual selection highlight",
+            "Selected file signal lifted to parent",
+            "Typecheck passes"
+          ],
+          "dependencies": ["02-changes-route-scaffold.md"],
+          "estimated_effort": "2 hours",
+          "order": 2
+        },
+        {
+          "filename": "04-diff-pane.md",
+          "title": "Build the diff viewing pane for the selected file",
+          "acceptance_criteria": [
+            "DiffPane renders diff for selected file using <diff> element",
+            "Split/unified auto-detection based on width and config",
+            "Handles added, deleted, modified, and binary files",
+            "Scrollable for large diffs",
+            "Typecheck passes"
+          ],
+          "dependencies": ["02-changes-route-scaffold.md", "03-file-list-sidebar.md"],
+          "estimated_effort": "2 hours",
+          "order": 3
+        },
+        {
+          "filename": "05-changes-footer.md",
+          "title": "Add footer with keybind hints and summary stats",
+          "acceptance_criteria": [
+            "Footer shows file count and total +/- stats",
+            "Keybind hints displayed",
+            "Reactive to file list data changes",
+            "Typecheck passes"
+          ],
+          "dependencies": ["03-file-list-sidebar.md"],
+          "estimated_effort": "0.5 hours",
+          "order": 3
+        },
+        {
+          "filename": "06-line-comments.md",
+          "title": "Add line commenting and submit-to-prompt",
+          "acceptance_criteria": [
+            "User can add comments via 'c' key with text input",
+            "Comments stored in local store with file/line/text",
+            "Comment count shown in footer",
+            "Shift+S formats and injects comments into prompt via route navigation",
+            "Typecheck passes"
+          ],
+          "dependencies": ["04-diff-pane.md"],
+          "estimated_effort": "3 hours",
+          "order": 4
+        }
+      ],
+      "total_items": 6,
+      "total_estimated_effort": "10 hours",
+      "dependency_graph": "WI-01 and WI-02 are independent (parallel). WI-03 depends on WI-02. WI-04 depends on WI-02+WI-03. WI-05 depends on WI-03. WI-06 depends on WI-04.",
+      "suggested_build_order": "Build WI-01 and WI-02 in parallel first. Then WI-03. Then WI-04 and WI-05 in parallel. Finally WI-06."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T12:01:00Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T12-00-00-commit-plan.json"
+  }
+}

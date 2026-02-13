@@ -1,0 +1,40 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "AI SDK wrapper cleanup complete - obsolete code removed, native integration preserved",
+    "data": {
+      "work_item": "cleanup-ai-sdk-wrapper.md",
+      "files_moved_to_native": [
+        "models.ts - CLAUDE_AGENT_SDK_MODELS, mapModelId",
+        "session-store.ts - ClaudeAgentSDKSessionStore",
+        "tool-bridge.ts - createOpenCodeToolsServer, DISABLED_SDK_TOOLS",
+        "tool-metadata-registry.ts - ToolMetadataRegistry"
+      ],
+      "files_deleted": [
+        "sdk/claude-agent-sdk/index.ts",
+        "sdk/claude-agent-sdk/claude-agent-sdk-model.ts (AI SDK wrapper model - obsolete)",
+        "sdk/claude-agent-sdk/translate-prompt.ts (AI SDK translation - obsolete)",
+        "sdk/claude-agent-sdk/translate-stream.ts (AI SDK translation - obsolete)",
+        "test/provider/sdk/claude-agent-sdk/translate.test.ts"
+      ],
+      "imports_updated": [
+        "native/claude-agent-sdk.ts - now uses local ./tool-bridge and ./models",
+        "session/llm.ts - imports session-store from native/",
+        "provider/provider.ts - removed createClaudeAgentSDK, imports CLAUDE_AGENT_SDK_MODELS from native/models"
+      ],
+      "validation": {
+        "typecheck": "passed",
+        "notes": "Test failures are preexisting issues with Bun/ESM module resolution of SDK, not related to cleanup"
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T12:10:00Z",
+    "work_item": "cleanup-ai-sdk-wrapper.md",
+    "parent_packet": "2026-01-26T12-01-00-orchestration-decision.json",
+    "blocking": false
+  }
+}

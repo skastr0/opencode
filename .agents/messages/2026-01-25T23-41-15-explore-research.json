@@ -1,0 +1,77 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for tool bridging between OpenCode, Claude Agent SDK, and Vercel AI SDK",
+    "data": {
+      "original_input": "Map OpenCode tool bridging architecture (tool-bridge.ts, translate-*.ts, ToolRegistry), identify where Vercel AI SDK manages tool calls, and pinpoint display breakage points.",
+      "codebase_findings": [
+        {
+          "path": "packages/opencode/src/tool/tool.ts",
+          "note": "Core tool definition via Tool.define with zod validation, truncation, and Tool.Context metadata/ask hooks. Tool outputs are {title, metadata, output, attachments?}."
+        },
+        {
+          "path": "packages/opencode/src/tool/registry.ts",
+          "note": "ToolRegistry builds the tool list: built-ins + custom tools from config directories + plugin tools. ToolRegistry.tools() filters by model/provider and returns initialized tools with zod parameters and execute handlers."
+        },
+        {
+          "path": "packages/opencode/src/session/prompt.ts",
+          "note": "SessionPrompt.resolveTools maps ToolRegistry tools into Vercel AI SDK tool definitions using ai.tool/jsonSchema. MCP tools are also wrapped here. This is the primary Vercel AI SDK tool management entry point."
+        },
+        {
+          "path": "packages/opencode/src/session/llm.ts",
+          "note": "LLM.stream uses streamText from the Vercel AI SDK. It passes tools + activeTools and handles experimental_repairToolCall; providerExecuted tool calls are remapped to a _providerExecuted stub. This is where Vercel AI SDK intercepts tool execution and validation."
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/tool-bridge.ts",
+          "note": "createOpenCodeToolsServer builds an MCP server for Claude Agent SDK using ToolRegistry + MCP tools. It converts zod -> JSON schema -> zod raw shape, excludes SDK_NATIVE_TOOLS (read/write/edit/bash/glob/grep/ls), and wires permission/metadata hooks."
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/claude-agent-sdk-model.ts",
+          "note": "ClaudeAgentSDKLanguageModel creates the MCP server (tool-bridge) and calls Claude Agent SDK query with permissionMode=bypassPermissions, includePartialMessages, and disallowedTools list."
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-prompt.ts",
+          "note": "translateToSDKPrompt converts Vercel AI SDK prompt into Claude Agent SDK prompt, including tool results as tool_result messages with tool_use_id."
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts",
+          "note": "createSDKStreamTransformer maps Claude SDK events to Vercel AI SDK stream parts. It emits tool-input-start, tool-call, and tool-result with providerExecuted=true. tool_use_summary produces synthetic tool output (summary/placeholder), not full tool output content."
+        },
+        {
+          "path": "packages/opencode/src/session/processor.ts",
+          "note": "SessionProcessor consumes tool-input-start/tool-call/tool-result to maintain MessageV2.ToolPart state; display depends on these events and matching toolCallId."
+        },
+        {
+          "path": "packages/opencode/src/session/message-v2.ts",
+          "note": "MessageV2.toModelMessages renders tool parts into UI tool output. Pending/running tools are converted to output-error to avoid dangling tool_use blocks."
+        },
+        {
+          "path": "packages/opencode/src/provider/transform.ts",
+          "note": "ProviderTransform.message normalizes toolCallId for Claude/Anthropic by replacing non-alphanumeric characters; this can affect toolCallId matching if upstream IDs differ." 
+        }
+      ],
+      "prior_art": [],
+      "patterns": [
+        "Dual tool-definition pipeline: ToolRegistry -> Vercel AI SDK tools (SessionPrompt.resolveTools) AND ToolRegistry -> Claude Agent SDK MCP server (tool-bridge).",
+        "Claude Agent SDK executes tools via MCP (providerExecuted=true) while Vercel AI SDK still owns the tool execution pipeline via streamText and tools/activeTools.",
+        "SDK-native tools (read/write/edit/bash/glob/grep/ls) are excluded from MCP tool-bridge, so Claude SDK uses its own native tools; OpenCode sees only summary events in translate-stream.",
+        "Tool result display relies on tool-call/tool-result parts; translate-stream synthesizes results from tool_use_summary with minimal output, which can be lossy for UI display."
+      ],
+      "raw_options": [
+        "Instrument the tool-call pipeline (translate-stream -> SessionProcessor) to trace tool_use_id/toolCallId/name mismatches and providerExecuted handling.",
+        "Bypass Vercel AI SDK tool execution when using Claude Agent SDK (omit tools/activeTools or use a direct stream path) so only MCP handles tools.",
+        "Keep Vercel AI SDK but add tool stubs per Claude tool name to avoid experimental_repairToolCall mapping to _providerExecuted (preserve display names).",
+        "Extend translate-stream to emit full tool output when available, or request richer tool result events from Claude SDK if supported.",
+        "Unify tool definitions by exposing only the MCP tool server to Claude SDK and removing duplicate tool schema conversions for SDK-native tools."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:41:15Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

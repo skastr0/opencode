@@ -1,0 +1,75 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "findings",
+    "data": {
+      "findings": [
+        {
+          "id": "F-001",
+          "agent": "codex",
+          "title": "Task tool accepts primary agents without enforcing subagent-only usage",
+          "severity": "medium",
+          "confidence": 0.73,
+          "evidence": {
+            "files": [
+              "packages/opencode/src/tool/task.ts:15",
+              "packages/opencode/src/tool/task.ts:31"
+            ],
+            "tests": [],
+            "metrics": {}
+          },
+          "rationale": "Task tool lists only non-primary agents in its description, but the executor only checks that the agent exists, so a primary agent name can still be passed and used.",
+          "suggested_fix": "Validate agent.mode before execution (reject primary), or normalize subagent_type to known non-primary agents.",
+          "links": []
+        },
+        {
+          "id": "F-002",
+          "agent": "codex",
+          "title": "Task tool falls back to parent message model when subagent has no model",
+          "severity": "medium",
+          "confidence": 0.68,
+          "evidence": {
+            "files": [
+              "packages/opencode/src/tool/task.ts:83",
+              "packages/opencode/src/tool/task.ts:84"
+            ],
+            "tests": [],
+            "metrics": {}
+          },
+          "rationale": "If a subagent lacks a model config (or it wasn't loaded), TaskTool uses the parent assistant message's model, which matches the current primary agent/model.",
+          "suggested_fix": "Require explicit model for subagents or add logging when falling back to parent model.",
+          "links": []
+        },
+        {
+          "id": "F-003",
+          "agent": "codex",
+          "title": "Commands can force subtasks with primary agents, creating Task calls for the current agent",
+          "severity": "low",
+          "confidence": 0.62,
+          "evidence": {
+            "files": [
+              "packages/opencode/src/session/prompt.ts:1357",
+              "packages/opencode/src/session/prompt.ts:1361",
+              "packages/opencode/src/command/index.ts:70",
+              "packages/opencode/src/command/index.ts:76"
+            ],
+            "tests": [],
+            "metrics": {}
+          },
+          "rationale": "When a command has subtask: true (e.g., /review), the system creates a subtask even if the agent is primary, so the Task tool runs with the current agent/model.",
+          "suggested_fix": "Set command.agent to a subagent or set subtask: false for primary-only commands.",
+          "links": []
+        }
+      ],
+      "summary": "0 critical, 0 high, 2 medium, 1 low",
+      "block_release": false
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T16:54:37Z",
+    "priority": "medium",
+    "blocking": false
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Select option 1 for fastest evidence on opus 400s",
+    "data": {
+      "work_item_id": "debug-opus-bad-requests",
+      "decision": "Instrument request and error logging before changing config",
+      "rationale": "Direct payload evidence is the fastest way to confirm whether effort/budget or other fields trigger the bad request.",
+      "from_phase": "exploring",
+      "to_phase": "committed",
+      "selected_option": "option-1",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T22:55:10Z",
+    "work_item": "debug-opus-bad-requests.md",
+    "parent_packet": "2026-01-20T22-52-14-explore-options.json",
+    "blocking": false
+  }
+}

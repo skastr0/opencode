@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Commit phase completed for sidebar enhancements with four buildable work items",
+    "data": {
+      "work_item": "changes-sidebar-collapsible-filter.md",
+      "decision": "Accepted commit plan and decomposed implementation into 4 items with explicit dependency order",
+      "rationale": "The decomposition isolates high-risk interaction logic first (collapsible rows), then layers filter behavior and UX hints, ending with an explicit runtime verification pass for comment reset and duplicate submission behavior.",
+      "from_phase": "committed",
+      "to_phase": "ready-for-build",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T21:36:56Z",
+    "work_item": "changes-sidebar-collapsible-filter.md",
+    "parent_packet": "2026-02-06T21-32-53Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

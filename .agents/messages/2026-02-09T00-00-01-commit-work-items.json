@@ -1,0 +1,77 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "work-items",
+  "content": {
+    "summary": "4 work items for provider timeout sleep/wake investigation",
+    "data": {
+      "work_items": [
+        {
+          "filename": "wi-01-timeout-path-test.md",
+          "title": "Unit test proving the 3 timeout config paths in provider fetch wrapper",
+          "acceptance_criteria": [
+            "Test file at packages/opencode/test/provider/timeout-paths.test.ts",
+            "Test: no timeout config → no AbortSignal.timeout on fetch",
+            "Test: timeout=60000 → AbortSignal.timeout(60000) combined with existing signal",
+            "Test: timeout=false → no AbortSignal.timeout, existing signals preserved",
+            "All tests pass with bun test"
+          ],
+          "dependencies": [],
+          "estimated_effort": "45 minutes",
+          "order": 1
+        },
+        {
+          "filename": "wi-02-abort-signal-sleep-simulation.md",
+          "title": "Test simulating stale AbortSignal after sleep/wake (hung fetch)",
+          "acceptance_criteria": [
+            "Test file at packages/opencode/test/provider/sleep-wake-timeout.test.ts",
+            "Test: hung fetch with no timeout causes observable hang",
+            "Test: hung fetch with AbortSignal.timeout eventually throws TimeoutError",
+            "Test: TimeoutError is classified as retryable by SessionRetry.retryable",
+            "All tests pass with bun test"
+          ],
+          "dependencies": ["wi-01-timeout-path-test.md"],
+          "estimated_effort": "45 minutes",
+          "order": 2
+        },
+        {
+          "filename": "wi-03-error-mapping-gap-test.md",
+          "title": "Test proving error classification gaps for timeout-like errors",
+          "acceptance_criteria": [
+            "Test file at packages/opencode/test/provider/error-mapping-timeout.test.ts",
+            "Test: DOMException TimeoutError through fromError — document actual classification",
+            "Test: DOMException AbortError through fromError — control case",
+            "Test: ETIMEDOUT SystemError through fromError — document classification",
+            "Test: EPIPE SystemError through fromError — document classification",
+            "Test: each error through SessionRetry.retryable — verify retry decision",
+            "All tests pass with bun test"
+          ],
+          "dependencies": ["wi-01-timeout-path-test.md", "wi-02-abort-signal-sleep-simulation.md"],
+          "estimated_effort": "30 minutes",
+          "order": 3
+        },
+        {
+          "filename": "wi-04-fix-proposal.md",
+          "title": "Document fix proposal with exact changes and risk assessment",
+          "acceptance_criteria": [
+            "Proposal addresses default timeout, TimeoutError handling, and post-sleep error codes",
+            "Each fix includes exact file+line, before/after, risk assessment",
+            "Includes validation plan",
+            "No code changes (investigation boundary)"
+          ],
+          "dependencies": ["wi-01-timeout-path-test.md", "wi-02-abort-signal-sleep-simulation.md", "wi-03-error-mapping-gap-test.md"],
+          "estimated_effort": "30 minutes",
+          "order": 4
+        }
+      ],
+      "total_items": 4,
+      "total_estimated_effort": "2.5 hours"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T00:00:01.000Z",
+    "work_item": "investigate-provider-timeout-sleep-wake.md",
+    "parent_packet": "2026-02-09T00-00-00-commit-plan.json"
+  }
+}

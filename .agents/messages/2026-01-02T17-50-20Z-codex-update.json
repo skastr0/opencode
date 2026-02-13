@@ -1,0 +1,32 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "update-report",
+    "data": {
+      "what_done": "Identified why subagent display appears correct only sometimes when navigating subagent sessions.",
+      "approach_taken": "Traced the prompt UI’s agent selection and compared it with agent mode filtering.",
+      "challenges_faced": "Reconciling the intermittent nature required comparing subagents configured as mode=all vs mode=subagent.",
+      "how_solved": "Verified the UI filters out mode=subagent from its selectable list, so only mode=all subagents can display correctly.",
+      "evidence": {
+        "files": [
+          "packages/opencode/src/cli/cmd/tui/context/local.tsx",
+          "packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx"
+        ],
+        "tests": [],
+        "metrics": {}
+      },
+      "reasoning": "The prompt bar is driven by local agent state, which excludes subagents; if the subagent is mode=all (default), it appears correctly, otherwise the UI shows the last primary agent.",
+      "next_steps": [
+        "Decide whether to let subagent sessions override the prompt bar with the session’s agent.",
+        "Audit subagent configs that are implicitly mode=all vs explicitly mode=subagent."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T17:50:20Z",
+    "priority": "low",
+    "blocking": false
+  }
+}

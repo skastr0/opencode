@@ -1,0 +1,31 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Starting Claude Agent SDK provider build phase",
+    "data": {
+      "work_items": [
+        "claude-agent-sdk-models",
+        "claude-agent-sdk-sessions", 
+        "claude-agent-sdk-streaming",
+        "claude-agent-sdk-language-model"
+      ],
+      "decision": "Fast path to building - designs are complete and detailed",
+      "rationale": "All work items have comprehensive technical designs with code examples. Dependencies are clear. No exploration needed.",
+      "build_order": [
+        "1. models.ts - Model definitions (no deps)",
+        "2. session-store.ts - Session management (no deps)",
+        "3. translate-stream.ts & translate-prompt.ts - Message translation",
+        "4. claude-agent-sdk-model.ts - LanguageModelV2 wrapper",
+        "5. index.ts - Provider factory + CUSTOM_LOADERS entry"
+      ],
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T12:00:00Z",
+    "work_item": "claude-agent-sdk-provider"
+  }
+}

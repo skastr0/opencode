@@ -1,0 +1,52 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "plan",
+  "content": {
+    "summary": "Implementation plan for: Single-file row-model refactor in FileList (collapsible dirs + fuzzy filter)",
+    "data": {
+      "goal": "Add true collapsible directory nodes and fuzzysort-based filename filter to the /changes sidebar FileList component while preserving stage grouping, selection payload shape, keyboard navigation, and diff-pane coupling.",
+      "learning_milestone": "A user can collapse/expand directory sections under each stage, type a fuzzy query to narrow the file list, and navigate the filtered/collapsed view with up/down/enter without any selection or diff regression — validated by typecheck + manual runtime walkthrough.",
+      "approach": "The implementation refactors file-list.tsx in three incremental layers that each preserve the existing onSelect/onSummary contract.\n\nFirst, the flat groups() memo is extended with a collapse-state map (Map<string, boolean> keyed by 'stage:dirName') and a derived visibleRows memo that excludes files under collapsed directories. The existing index/selected/positions signals are rewired to operate over visibleRows instead of the raw files() list, keeping the onSelect payload shape identical. Directory header rows become interactive toggle targets (click and a new hotkey) that flip the collapse map. Collapse state is pruned against current tree paths after refetch.\n\nSecond, a filter signal and a fuzzysort-scored derivation are inserted between the raw file list and the collapse/visible-row pipeline. When filter is non-empty, files are scored by path, non-matching files are excluded, and parent directory headers are retained for matching descendants. An inline <input> element is added at the top of the file list with explicit editing-mode state that suppresses j/k/r hotkeys while typing. The '/' hotkey activates filter focus; Escape clears and exits.\n\nThird, the footer hint text is updated to reflect the new hotkeys (collapse/expand toggle, filter activation), and a manual runtime verification checklist confirms comment reset behavior and duplicate-submit prevention.",
+      "changes_required": [
+        {"file": "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx", "change": "Add collapsed state map, visibleRows memo, filter signal with fuzzysort, editing-mode guard, directory toggle rendering, inline filter input, updated keyboard handler with hotkey isolation"},
+        {"file": "packages/opencode/src/cli/cmd/tui/routes/changes/footer.tsx", "change": "Add hints for / (filter), space/enter on dirs (toggle collapse)"}
+      ],
+      "challenges": {
+        "technical": [
+          {"challenge": "Keyboard isolation when filter input is focused", "why_hard": "Three independent useKeyboard handlers (route, file-list, diff-pane) all gate only on dialog.stack — an inline <input> is not a dialog", "mitigation": "Add an explicit 'editing' signal in FileList; check it in the file-list keyboard handler to suppress j/k/r/up/down while typing. Route-level S and Esc already work correctly because they check dialog.stack only."},
+          {"challenge": "Selection stability across collapse/filter transitions", "why_hard": "Collapsing a dir or filtering can remove the currently selected row from visibleRows, causing index out-of-bounds or silent deselection", "mitigation": "After recomputing visibleRows, attempt to find current selected().id in the new list and remap index; if not found, clamp to nearest valid index and emit onSelect for the new item."},
+          {"challenge": "Collapse state persistence across refetch", "why_hard": "refetch() rebuilds the raw file list — collapsed dirs may appear/disappear", "mitigation": "Prune collapse map keys against current tree after each status() update; new dirs default to expanded."},
+          {"challenge": "Filter + collapse interaction", "why_hard": "If a dir is collapsed but its children match the filter, should they show?", "mitigation": "When filter is active, ignore collapse state entirely — show all matching files with parent context. Collapse only applies when filter is empty."}
+        ],
+        "resourcing": {
+          "estimated_effort": "3-5 hours across 3-4 work items",
+          "dependencies": ["fuzzysort already in package.json (v3.1.0)", "No new dependencies needed", "No server-side changes needed"],
+          "skills_required": ["SolidJS reactive primitives (createSignal, createMemo, createStore)", "fuzzysort API (go() with keys)", "OpenTUI keyboard event model", "Understanding of the existing FileSelection contract"],
+          "risk_factors": ["Manual testing is required for keyboard behavior — no automated TUI keyboard tests exist", "The file-list.tsx will grow from ~280 to ~400-450 lines, approaching extraction threshold"]
+        },
+        "open_questions": [
+          "Should space or enter toggle collapse on directory rows? (Recommend space to avoid conflict with enter=select which is currently used for file selection.)",
+          "Should the filter input be always-visible or toggle-visible via '/'? (Recommend toggle-visible to keep sidebar compact for small change sets.)",
+          "When a filter match narrows to a single file, should it auto-select? (Recommend no — let the user confirm with enter to avoid accidental diff switches.)"
+        ]
+      },
+      "testing_strategy": {
+        "unit": ["Not feasible without extracting the transformer — intentionally deferred per Option 1 strategy"],
+        "integration": ["bun run typecheck must pass", "Manual runtime verification checklist (see work item 4)"]
+      },
+      "risks": [
+        {"risk": "File-list keyboard handler grows complex with editing-mode guard", "mitigation": "Single boolean signal check at top of handler; if true, only handle Escape and Enter"},
+        {"risk": "fuzzysort scoring on paths may rank poorly for deep nested files", "mitigation": "Use fuzzysort.go() with key: 'path' and verify with 10+ file change sets; the codebase's own DialogSelect uses the same approach successfully"},
+        {"risk": "Collapse chevron rendering may misalign in narrow 38-char sidebar", "mitigation": "Use single-char ▶/▼ indicators at 2-space indent, matching session sidebar pattern"}
+      ],
+      "work_items": ["01-collapsible-directory-nodes.md", "02-fuzzy-filter-input.md", "03-footer-hints-update.md", "04-runtime-verification-checklist.md"]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T22:00:00Z",
+    "work_item": "changes-sidebar-collapsible-filter.md",
+    "parent_packet": "2026-02-06T21-31-06Z-explore-options.json"
+  }
+}

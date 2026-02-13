@@ -1,0 +1,52 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Clarify and improve visibility into tool call lifecycle for Claude Agent SDK and subagent sessions in OpenCode, including event flow and metadata coverage.",
+      "constraints": [
+        "Explore phase only (no code changes).",
+        "Claude Agent SDK tools are provider-executed; local execution is bypassed.",
+        "Tool progress visibility depends on MessageV2.ToolPart updates and stream events."
+      ],
+      "options": [
+        {
+          "name": "Document current tool event flow and visibility",
+          "approach": "Compile a concise map of stream events (ClaudeNativeStreamEvent) -> SessionProcessor updates -> MessageV2.ToolPart states, plus Bus events and Plugin hooks, and verify which pieces reach client serialization (toModelMessages).",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Exact lifecycle signals available today and where they are dropped or transformed.",
+          "risk_if_wrong": "Low; purely observational.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Probe metadata gaps in Claude SDK tool flow",
+          "approach": "Trace how tool_use/tool_result/tool_use_summary are translated, compare against ToolMetadataRegistry store-only behavior, and list missing enrichment points.",
+          "time_to_learning": "0.5 day",
+          "what_we_learn": "Where metadata is lost (tool_use_id, title, sessionId, attachments) and concrete insertion points.",
+          "risk_if_wrong": "Low-medium; requires careful mapping of SDK message variants.",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Validate subagent session propagation",
+          "approach": "Follow TaskTool -> SessionPrompt.prompt -> Bus subscription flow and produce a parent-child session diagram with data passed back (summary, sessionId, model).",
+          "time_to_learning": "0.5 day",
+          "what_we_learn": "How subagent outputs and tool progress are surfaced to parent sessions, and what is missing for full tool visibility.",
+          "risk_if_wrong": "Low; bounded to session/task logic.",
+          "reversibility": "high",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it yields the fastest end-to-end visibility map and establishes a shared baseline for any follow-up changes."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T16:35:41Z",
+    "work_item": null,
+    "parent_packet": "2026-01-26T16-35-36Z-explore-research.json"
+  }
+}

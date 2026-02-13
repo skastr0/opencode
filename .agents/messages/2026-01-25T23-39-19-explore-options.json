@@ -1,0 +1,53 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Assess feasibility of bypassing Vercel AI SDK by mapping where OpenCode depends on AI SDK abstractions and identifying the smallest viable replacement path for Claude Agent SDK.",
+      "constraints": [
+        "OpenCode uses AI SDK types (ModelMessage, Tool, StreamTextResult) across session/prompt/tooling flows.",
+        "Providers are instantiated via @ai-sdk/* packages in Provider.getLanguage and depend on LanguageModelV2.",
+        "Streaming relies on streamText/wrapLanguageModel middleware and ProviderTransform message/options mapping.",
+        "Claude Agent SDK already emits providerExecuted tool events that OpenCode bridges via AI SDK stream parts."
+      ],
+      "options": [
+        {
+          "name": "Feature-flagged Claude direct path",
+          "approach": "Add a Claude-only stream path that calls @anthropic-ai/claude-agent-sdk directly (bypassing streamText) while keeping AI SDK for all other providers. Reuse existing translate-prompt/stream adapters to minimize changes.",
+          "time_to_learning": "4-8 hours",
+          "what_we_learn": "Which AI SDK responsibilities must be re-implemented (middleware, tool repair, usage handling) for a single provider.",
+          "risk_if_wrong": "Low; isolated to Claude path with a feature flag.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Introduce internal model interface",
+          "approach": "Define an OpenCode-specific model interface and adapt AI SDK and Claude Agent SDK behind it, progressively migrating session/llm and tool flows.",
+          "time_to_learning": "1-2 days",
+          "what_we_learn": "True surface area of AI SDK coupling and migration costs for other providers.",
+          "risk_if_wrong": "Medium; touches shared abstractions.",
+          "reversibility": "medium",
+          "rank": 2
+        },
+        {
+          "name": "Full replacement of streamText pipeline",
+          "approach": "Replace streamText/wrapLanguageModel with direct SDK streaming for all providers and re-implement middleware, tool calling, and reasoning extraction in OpenCode.",
+          "time_to_learning": "3-7 days",
+          "what_we_learn": "Complete cost and feasibility of removing AI SDK entirely.",
+          "risk_if_wrong": "High; broad changes across providers and tooling.",
+          "reversibility": "low",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it isolates the bypass to Claude, yields fast feedback on AI SDK responsibilities, and is highly reversible."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:39:19Z",
+    "work_item": null,
+    "parent_packet": "2026-01-25T23-39-19-explore-research.json"
+  }
+}

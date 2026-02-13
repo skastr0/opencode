@@ -1,0 +1,51 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented sanitized DEBUG request logging for Opus bad request diagnostics.",
+    "data": {
+      "work_item": "debug-opus-bad-requests.md",
+      "files_changed": [
+        "packages/opencode/src/session/llm.ts",
+        "packages/opencode/test/session/llm.test.ts",
+        ".agents/sdlc/reviewing/debug-opus-bad-requests.md"
+      ],
+      "files_added": [],
+      "tests_added": [
+        "packages/opencode/test/session/llm.test.ts"
+      ],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "pass"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "A DEBUG log entry emitted before streamText includes providerID, modelID, sessionID, agent name, variant key, and maxOutputTokens.",
+          "status": "met"
+        },
+        {
+          "criterion": "Log payload includes thinking summary (effort + budget) and message/tool counts without prompt text, file contents, or auth headers.",
+          "status": "met"
+        },
+        {
+          "criterion": "Variant selection is logged without changing merge order; missing variants log as null.",
+          "status": "met"
+        },
+        {
+          "criterion": "Logging is gated by DEBUG level so INFO output remains unchanged.",
+          "status": "met"
+        }
+      ],
+      "notes": "Added buildRequestLog helper and DEBUG instrumentation before streamText; reused active tool keys for log counts.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T23:08:34Z",
+    "work_item": "debug-opus-bad-requests.md",
+    "parent_packet": "2026-01-20T22-57-58Z-commit-plan.json"
+  }
+}

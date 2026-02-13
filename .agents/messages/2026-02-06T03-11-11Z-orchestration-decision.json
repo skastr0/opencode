@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Incorporating upstream PR implementations into feasibility exploration",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Dispatch additional explorer probes focused on opencode#12188 and opentui#621",
+      "rationale": "User identified relevant upstream implementations. We should evaluate what can be reused directly, what should be simplified for fork maintenance, and whether opentui-core changes can be avoided.",
+      "from_phase": "exploring",
+      "to_phase": "exploring",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:11:11Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T03-02-55Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

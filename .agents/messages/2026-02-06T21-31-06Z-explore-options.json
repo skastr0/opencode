@@ -1,0 +1,78 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning for collapsible /changes sidebar + fuzzy filter",
+    "data": {
+      "problem": "Implement true collapsible directory nodes and fuzzy filename/path filtering in /changes while preserving keyboard navigation, selection-driven diff behavior, and validating the recent comment reset fix.",
+      "constraints": [
+        "Must preserve stage grouping (staged/unstaged/untracked) and duplicate file visibility across stages.",
+        "Must preserve current selection -> DiffPane behavior and click/keyboard parity.",
+        "Must not break dialog-stack hotkey isolation for comment prompts.",
+        "Collapse state must persist across navigation/refresh and only drop paths that no longer exist.",
+        "Scope should stay mostly in file-list.tsx unless selection contract changes require parent updates."
+      ],
+      "options": [
+        {
+          "name": "Single-file row-model refactor in FileList",
+          "approach": "Refactor file-list.tsx to build stage trees + collapse map + filtered visible rows, while keeping existing selected index and onSelect contract. Add fuzzysort-based matching directly in component and render toggle rows for directories.",
+          "time_to_learning": "2-4 hours",
+          "what_we_learn": "Whether existing FileList state model can absorb collapse+filter features without touching parent route or DiffPane.",
+          "risk_if_wrong": "Medium: logic density in one file can raise regression risk in keyboard and selection edge cases.",
+          "reversibility": "high",
+          "complexity": "medium",
+          "regression_risk": "medium",
+          "key_files_touched": [
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/footer.tsx"
+          ],
+          "ux_tradeoffs": "Fastest delivery, but keyboard/focus behavior can feel brittle if filter typing and navigation are not clearly separated.",
+          "rank": 1
+        },
+        {
+          "name": "Extract pure view-model transformer then integrate",
+          "approach": "Create a pure transformer for stage tree + collapse pruning + fuzzy filter + visible rows, unit-test it, then wire FileList rendering/keyboard against that stable output.",
+          "time_to_learning": "4-6 hours",
+          "what_we_learn": "Whether tree/filter behavior can be made deterministic and testable before UI wiring, reducing hidden regressions.",
+          "risk_if_wrong": "Low-medium: more upfront structure, but reduced runtime surprises.",
+          "reversibility": "high",
+          "complexity": "medium-high",
+          "regression_risk": "low-medium",
+          "key_files_touched": [
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list-view-model.ts (new)",
+            "packages/opencode/test/routes/changes/file-list-view-model.test.ts (new)"
+          ],
+          "ux_tradeoffs": "Slightly slower path, but usually yields more consistent behavior for collapsed/filtered edge cases.",
+          "rank": 2
+        },
+        {
+          "name": "Route-level state orchestration for filter+selection",
+          "approach": "Lift filter and active-row state to changes/index.tsx, pass controlled props into FileList, and gate route-level hotkeys when filter is focused. Treat FileList as mostly presentational.",
+          "time_to_learning": "6-9 hours",
+          "what_we_learn": "Whether centralizing state improves long-term extensibility (saved filters, richer shortcuts, cross-pane coordination).",
+          "risk_if_wrong": "Medium-high: larger surface area and more chances to break existing behavior.",
+          "reversibility": "medium",
+          "complexity": "high",
+          "regression_risk": "medium-high",
+          "key_files_touched": [
+            "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/diff-pane.tsx",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/footer.tsx"
+          ],
+          "ux_tradeoffs": "Most flexible future UX, but highest chance of temporary keybinding confusion during iteration.",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 first because it is the fastest useful path that can validate AC-1..AC-6 with minimal file surface. If edge-case regressions appear, pivot immediately to Option 2 by extracting the transformer without discarding the UI work."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T21:31:06Z",
+    "work_item": "changes-sidebar-collapsible-filter.md",
+    "parent_packet": "2026-02-06T21-31-06Z-explore-research.json"
+  }
+}

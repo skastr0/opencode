@@ -1,0 +1,53 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Synthesized explorer findings on subagent TUI updates - identified root cause and options",
+    "data": {
+      "work_item": "subagent-tui-updates.md",
+      "investigation_summary": {
+        "root_cause": "MCP tool calls don't propagate metadata because tool_use_id/callID is missing in MCP handlers, causing ctx.metadata calls to no-op. Additionally, ToolMetadataRegistry stores metadata but has no retrieval path wired into tool_use_summary processing.",
+        "key_files": {
+          "tool_bridge": "packages/opencode/src/provider/native/tool-bridge.ts - MCP server for tools, callID missing",
+          "claude_agent_sdk": "packages/opencode/src/provider/native/claude-agent-sdk.ts - no ToolMetadataRegistry.retrieve()",
+          "task_tool": "packages/opencode/src/tool/task.ts - subscribes to child session events, updates metadata",
+          "tui_session": "packages/opencode/src/cli/cmd/tui/routes/session/index.tsx - Task component renders metadata.summary",
+          "sync_context": "packages/opencode/src/cli/cmd/tui/context/sync.tsx - SSE event subscription"
+        },
+        "current_behavior": "Task UI shows agent name from props.input.subagent_type, tool count from metadata.summary, but metadata updates from child session are not propagating through MCP path"
+      },
+      "options": [
+        {
+          "id": 1,
+          "name": "Restore Task metadata propagation for MCP tools",
+          "approach": "Fix tool_use_id/callID availability in tool-bridge.ts and wire ToolMetadataRegistry.retrieve() into tool_use_summary processing",
+          "time_estimate": "1-2 hours",
+          "risk": "low",
+          "recommended": true
+        },
+        {
+          "id": 2,
+          "name": "TUI-side child session mirroring",
+          "approach": "When Task metadata has sessionId, sync child session and render its tool parts inline",
+          "time_estimate": "2-4 hours",
+          "risk": "medium"
+        },
+        {
+          "id": 3,
+          "name": "Server-side aggregation of subagent tool progress",
+          "approach": "Mirror child tool updates into parent session metadata/event stream",
+          "time_estimate": "0.5-1 day",
+          "risk": "medium-high"
+        }
+      ],
+      "explorers_dispatched": 3,
+      "packets_created": 6
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T17:45:00Z",
+    "work_item": "subagent-tui-updates.md"
+  }
+}

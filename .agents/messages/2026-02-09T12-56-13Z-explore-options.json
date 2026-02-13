@@ -1,0 +1,63 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning for sleep/wake timeout/UnknownError failures",
+    "data": {
+      "problem": "Intermittent provider failures (timeout and UnknownError) appear during/after Mac sleep-wake while requests are in-flight; timeout and cancellation now rely on merged abort signals in provider fetch wrapper.",
+      "constraints": [
+        "Research-only in this phase (no implementation).",
+        "Need evidence tied to provider timeout/signal path in provider.ts.",
+        "Must preserve session cancellation semantics and avoid breaking retries.",
+        "Issue is intermittent and likely timing-sensitive (sleep/wake window)."
+      ],
+      "options": [
+        {
+          "name": "Config A/B isolation (no code)",
+          "approach": "Run controlled sessions with provider timeout=false, then explicit timeout (e.g. 300000), force sleep/wake mid-request, compare error classes and persistence behavior.",
+          "time_to_learning": "30-90 minutes",
+          "what_we_learn": "Whether timeout signal path itself is the dominant trigger vs generic post-sleep transport instability.",
+          "risk_if_wrong": "Low; may only narrow scope without root cause.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "High-signal diagnostics at fetch/error boundary",
+          "approach": "Temporarily instrument provider fetch wrapper and MessageV2.fromError to log timeout value, signal.aborted/reason name, thrown error constructor/name, and APICallError detection outcome.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Exact error-shape mismatch causing UnknownError and whether AbortSignal.timeout emits AbortError vs TimeoutError in real failures.",
+          "risk_if_wrong": "Low-medium; could still miss race if reproduction is rare.",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Targeted normalization fix experiment",
+          "approach": "Prototype handling for TimeoutError/ETIMEDOUT/abort-like variants in MessageV2.fromError and retry classification, then rerun sleep/wake scenario.",
+          "time_to_learning": "2-4 hours",
+          "what_we_learn": "Whether user-visible UnknownError is mostly classification debt rather than transport behavior.",
+          "risk_if_wrong": "Medium; may improve UX while underlying transport issue remains.",
+          "reversibility": "high",
+          "rank": 3
+        },
+        {
+          "name": "Provider fetch wrapper semantics hardening",
+          "approach": "Prototype non-mutating signal composition and optional clearable timeout helper to avoid stale signal propagation and timer side effects.",
+          "time_to_learning": "3-6 hours",
+          "what_we_learn": "Whether mutable init/signal composition contributes to intermittent failures after long-lived/sleep-disrupted requests.",
+          "risk_if_wrong": "Medium; broader surface area and harder to isolate causality.",
+          "reversibility": "medium",
+          "rank": 4
+        }
+      ],
+      "recommendation": "Option 1 first, then Option 2 immediately if failures reproduce. This gives fastest causal separation (timeout path vs generic sleep/wake transport breakage) with minimal blast radius."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T12:56:13Z",
+    "work_item": null,
+    "parent_packet": "2026-02-09T12-56-13Z-explore-research.json",
+    "blocking": false
+  }
+}

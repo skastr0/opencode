@@ -1,0 +1,129 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: staged/unstaged git change ingestion for a review UI in opencode",
+    "data": {
+      "original_input": "Explore feasibility for obtaining staged and unstaged git changes for the active folder/project and feeding them into a review UI.",
+      "codebase_findings": [
+        {
+          "topic": "Existing git status/diff utilities",
+          "details": "`File.status()` uses `git diff --numstat HEAD`, `git ls-files --others --exclude-standard`, and deleted-file detection via `git diff --name-only --diff-filter=D HEAD`. `File.read()` checks git changes (`git diff <file>`, fallback `git diff --staged <file>`) and emits a structured patch via `structuredPatch`/`formatPatch`.",
+          "files": [
+            "packages/opencode/src/file/index.ts:353",
+            "packages/opencode/src/file/index.ts:427"
+          ],
+          "functions": [
+            "File.status",
+            "File.read"
+          ]
+        },
+        {
+          "topic": "Session diff pipeline already used by UI",
+          "details": "Session summaries compute diffs from OpenCode snapshot commits (`Snapshot.diffFull`) and expose them via `/session/:sessionID/diff`. Data shape includes file path, before/after content, additions/deletions, and optional status. TUI sidebar consumes this as `session_diff`.",
+          "files": [
+            "packages/opencode/src/session/summary.ts:195",
+            "packages/opencode/src/snapshot/index.ts:184",
+            "packages/opencode/src/server/routes/session.ts:418",
+            "packages/opencode/src/cli/cmd/tui/context/sync.tsx:54",
+            "packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx:20"
+          ],
+          "functions": [
+            "SessionSummary.computeDiff",
+            "Snapshot.diffFull"
+          ]
+        },
+        {
+          "topic": "Active folder/project resolution",
+          "details": "Server middleware resolves directory per request from `query.directory` or `x-opencode-directory`, else `process.cwd()`. `Instance.provide()` builds context from that directory and resolves git root (`worktree`) via `Project.fromDirectory()`. SDK clients can set a persistent directory header.",
+          "files": [
+            "packages/opencode/src/server/server.ts:190",
+            "packages/opencode/src/project/instance.ts:22",
+            "packages/opencode/src/project/project.ts:53",
+            "packages/sdk/js/src/v2/client.ts:8"
+          ],
+          "functions": [
+            "Server.App middleware",
+            "Instance.provide",
+            "Project.fromDirectory",
+            "createOpencodeClient"
+          ]
+        },
+        {
+          "topic": "Current API coverage for review data",
+          "details": "Available APIs: file tree (`/file` -> `FileNode[]`), file status (`/file/status` -> `File[]`), file content+patch (`/file/content` -> `FileContent` with hunks), and session diffs (`/session/:id/diff` -> `FileDiff[]`). Missing API: explicit staged vs unstaged separation in one response.",
+          "files": [
+            "packages/opencode/src/server/routes/file.ts:118",
+            "packages/opencode/src/server/routes/file.ts:176",
+            "packages/opencode/src/server/routes/session.ts:418",
+            "packages/sdk/js/src/v2/gen/types.gen.ts:2094"
+          ],
+          "functions": [
+            "FileRoutes /file",
+            "FileRoutes /file/status",
+            "FileRoutes /file/content",
+            "SessionRoutes /:sessionID/diff"
+          ]
+        },
+        {
+          "topic": "Review UI diff rendering primitives already exist",
+          "details": "TUI already renders unified diffs with `<diff diff={...}>` for edit/apply_patch/permission flows. Web share UI parses unified patch text via `parsePatch` and renders side-by-side/mobile diff blocks.",
+          "files": [
+            "packages/opencode/src/cli/cmd/tui/routes/session/index.tsx:1973",
+            "packages/opencode/src/cli/cmd/tui/routes/session/permission.tsx:73",
+            "packages/web/src/components/share/content-diff.tsx:1"
+          ],
+          "functions": [
+            "ApplyPatch component",
+            "Edit component",
+            "ContentDiff"
+          ]
+        },
+        {
+          "topic": "Performance/binary behavior relevant to review",
+          "details": "Tool outputs are globally truncated (2000 lines / 50KB), but HTTP `file.read` is not truncated and currently computes full-context patch (`context: Infinity`) after loading whole file text (also `.trim()`s content). Binary/image handling exists in `File.read`; `Snapshot.diffFull` skips binary content when numstat reports `-`/`-`. `File.status` reads untracked file content to count lines, which is expensive for large files.",
+          "files": [
+            "packages/opencode/src/tool/tool.ts:69",
+            "packages/opencode/src/tool/truncation.ts:10",
+            "packages/opencode/src/file/index.ts:73",
+            "packages/opencode/src/file/index.ts:473",
+            "packages/opencode/src/snapshot/index.ts:217",
+            "packages/web/src/components/share/content-diff.tsx:18"
+          ],
+          "functions": [
+            "Tool.define (truncation)",
+            "Truncate.output",
+            "File.read",
+            "Snapshot.diffFull"
+          ]
+        }
+      ],
+      "prior_art": [
+        "No `learn-retrospective` packets found in `.agents/messages/` for this topic"
+      ],
+      "patterns": [
+        "Directory/workspace scope is request-scoped through `Instance.directory`; git root is tracked separately as `Instance.worktree`.",
+        "Existing review-like surfaces consume unified diff strings; they do not require custom binary patch formats.",
+        "Current git APIs are oriented to aggregate file change stats, not stage-aware review models.",
+        "Session-level diffs already use a rich file model (`before`/`after`), but based on OpenCode snapshots rather than git index/worktree state."
+      ],
+      "raw_options": [
+        "Compose a review panel from existing `/file/status` + `/file/content` APIs and infer staged/unstaged heuristically client-side.",
+        "Add a dedicated git review endpoint returning `staged` and `unstaged` sections separately with unified diffs and parsed hunks.",
+        "Build a two-step endpoint: lightweight file list first, lazy per-file hunk fetch on expansion.",
+        "Reuse `Snapshot.FileDiff` shape for git-backed diffs and add `scope: staged|unstaged` field.",
+        "Keep using bash/git commands for review data (`git diff`, `git diff --cached`, `git status --porcelain`) and parse server-side into a stable DTO.",
+        "Prototype with staged/unstaged patch text only, postpone per-line metadata computation to UI parser.",
+        "Add binary/file-size guardrails before diff hydration to prevent oversized responses.",
+        "Support subdirectory-scoped reviews by defaulting to `Instance.directory`, with optional repo-root mode based on `Instance.worktree`."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:08:05Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

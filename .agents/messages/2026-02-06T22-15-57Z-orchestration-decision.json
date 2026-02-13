@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Regressed WI-02 to building to address review findings",
+    "data": {
+      "work_item": "02-fuzzy-filter-input.md",
+      "decision": "Apply focused fixes for collapse-state pruning during active filter and keyboard timeout guard",
+      "rationale": "Review surfaced a medium-risk behavior mismatch: filter could unintentionally reset collapsed directories, violating expected stability. Fixing now keeps AC behavior aligned before completion.",
+      "from_phase": "reviewing",
+      "to_phase": "building",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T22:15:57Z",
+    "work_item": "02-fuzzy-filter-input.md",
+    "parent_packet": "2026-02-06T21-56-02Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Need a clear, actionable picture of how opencode selects models, configures providers, and sets model parameters (including any verbosity/reasoning controls).",
+      "constraints": [
+        "Explore phase only: no code or implementation artifacts",
+        "Prefer fastest learning loops over exhaustive analysis"
+      ],
+      "options": [
+        {
+          "name": "Trace the model pipeline end-to-end",
+          "approach": "Summarize the flow from config → Provider.state → getSDK/getLanguage → LLM.stream → provider request payload with a concrete example model.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Exact precedence rules and where parameters land in the request body.",
+          "risk_if_wrong": "Low — uses existing code paths only.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Config surface area matrix",
+          "approach": "List all configurable fields (config + CLI + env) and map them to provider options and model parameters, including reasoning/verbosity controls.",
+          "time_to_learning": "2-3 hours",
+          "what_we_learn": "Which knobs are user-tweakable vs. hardcoded defaults.",
+          "risk_if_wrong": "Low — purely documentation-level mapping.",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Provider-specific deep dives",
+          "approach": "Pick 2-3 providers (OpenAI/Anthropic/Google) and document their custom loaders, env vars, and parameter quirks.",
+          "time_to_learning": "3-5 hours",
+          "what_we_learn": "Provider-specific constraints and likely configuration pitfalls.",
+          "risk_if_wrong": "Medium — more time, still read-only.",
+          "reversibility": "high",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 — fastest way to validate the actual parameter flow and model selection precedence before expanding into a config matrix."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-15T15-36-52Z",
+    "work_item": null,
+    "parent_packet": "2026-01-15T15-36-52Z-explore-research.json"
+  }
+}

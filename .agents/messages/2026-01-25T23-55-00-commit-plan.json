@@ -1,0 +1,50 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "commit",
+  "type": "plan",
+  "content": {
+    "summary": "Created 5 work items for Claude Agent SDK V2 native integration",
+    "data": {
+      "work_items": [
+        {
+          "id": "claude-v2-native-stream",
+          "title": "Claude Agent SDK V2 Native Streaming Core",
+          "estimate_hours": 1.5,
+          "dependencies": []
+        },
+        {
+          "id": "claude-v2-llm-routing", 
+          "title": "LLM.stream() Native Path Routing",
+          "estimate_hours": 1,
+          "dependencies": ["claude-v2-native-stream"]
+        },
+        {
+          "id": "claude-v2-tool-execution",
+          "title": "Native Path Tool Execution Integration", 
+          "estimate_hours": 1.5,
+          "dependencies": ["claude-v2-native-stream", "claude-v2-llm-routing"]
+        },
+        {
+          "id": "claude-v2-session-management",
+          "title": "Native Path Session Management",
+          "estimate_hours": 0.5,
+          "dependencies": ["claude-v2-native-stream"]
+        },
+        {
+          "id": "claude-v2-cleanup",
+          "title": "Cleanup Old V1 SDK Wrapper Code",
+          "estimate_hours": 0.5,
+          "dependencies": ["all above"]
+        }
+      ],
+      "total_estimate_hours": 5,
+      "architecture": "Native path for Claude, AI SDK path for others, coexisting",
+      "key_insight": "V2 SDK's send/stream pattern eliminates async generator complexity"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:55:00Z",
+    "work_item": "direct-agents-sdk-integration.md"
+  }
+}

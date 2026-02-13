@@ -1,0 +1,52 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Subagent tool calls (mcp_opencode_task/task) are not visibly updating in the TUI because the parent session only renders its own ToolParts and Task metadata does not reliably propagate for MCP tool execution.",
+      "constraints": [
+        "Explore phase only: no code changes or implementation plans",
+        "TUI renders from sync store (message/part events)",
+        "Subagent work occurs in child sessions (parentID)"
+      ],
+      "options": [
+        {
+          "name": "Restore Task metadata propagation for MCP tools",
+          "approach": "Validate tool_use_id/callID availability in MCP handlers and ensure Task tool metadata (summary/sessionId) is merged into tool_use_summary/tool-result metadata so the Task UI receives updates.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Whether missing metadata is the root cause for absent subagent updates in TUI; exact place metadata is dropped.",
+          "risk_if_wrong": "Low; investigation is localized to provider/native stream/bridge.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "TUI-side child session mirroring",
+          "approach": "When Task tool has metadata.sessionId, have the TUI sync that child session and render its tool parts inline or in an expandable panel.",
+          "time_to_learning": "2-4 hours",
+          "what_we_learn": "Whether rendering child session parts directly yields the desired visibility without server changes.",
+          "risk_if_wrong": "Medium; multi-session data flow and UI performance concerns.",
+          "reversibility": "medium",
+          "rank": 2
+        },
+        {
+          "name": "Server-side aggregation of subagent tool progress",
+          "approach": "Add a parent-session summary stream that mirrors child tool updates into the Task tool metadata (or a new event), avoiding TUI multi-session rendering.",
+          "time_to_learning": "0.5-1 day",
+          "what_we_learn": "Feasibility of a centralized progress feed and whether it simplifies UI.",
+          "risk_if_wrong": "Medium-high; touches session/tool event flow.",
+          "reversibility": "medium",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it is the fastest path to validate whether metadata propagation is the blocker for subagent tool visibility, and it keeps changes localized to the MCP tool bridge/stream layer."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T17:30:00Z",
+    "work_item": "subagent-tui-updates.md",
+    "parent_packet": "2026-01-26T17-30-00-explore-research.json"
+  }
+}

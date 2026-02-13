@@ -1,0 +1,70 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: OpenCode native Claude Agent SDK tool call lifecycle and subagent sessions",
+    "data": {
+      "original_input": "Explore OpenCode to understand how the native agents SDK handles tool calls: integration, tool call lifecycle, and session/subagent architecture.",
+      "codebase_findings": [
+        {
+          "file": "packages/opencode/src/session/llm.ts",
+          "notes": "Routes providerID=claude-agent-sdk through streamClaudeNative, manages SDK session resume via ClaudeAgentSDKSessionStore, adds _providerExecuted tool stub, and merges tool validation/repair for provider-executed calls."
+        },
+        {
+          "file": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+          "notes": "Implements streamClaudeNative using Claude Agent SDK query(); converts SDK messages to ClaudeNativeStreamEvent (text, reasoning, tool-call/result/error); normalizes tool names/params; handles tool_use, tool_result, tool_progress/tool_use_summary; uses includePartialMessages for streaming."
+        },
+        {
+          "file": "packages/opencode/src/provider/native/tool-bridge.ts",
+          "notes": "Creates MCP server for OpenCode tools, pre-creates ToolPart before execution, buffers metadata updates, applies Plugin hooks tool.execute.before/after, and uses PermissionNext in tool context; maps MCP and registry tools to SDK handlers."
+        },
+        {
+          "file": "packages/opencode/src/session/processor.ts",
+          "notes": "Consumes LLM stream events; creates ToolPart on tool-input-start, transitions to running on tool-call, completes on tool-result, errors on tool-error; merges metadata; updates step start/finish and session usage."
+        },
+        {
+          "file": "packages/opencode/src/session/message-v2.ts",
+          "notes": "Defines ToolPart state machine (pending/running/completed/error) and Bus events (message.part.updated) used for tool progress signaling; converts tool parts to model messages."
+        },
+        {
+          "file": "packages/opencode/src/session/prompt.ts",
+          "notes": "Builds AI SDK ToolSet for non-native providers; wraps tool execution with Plugin hooks; constructs Tool.Context with ctx.metadata() updates; processes subtask parts by calling TaskTool."
+        },
+        {
+          "file": "packages/opencode/src/tool/task.ts",
+          "notes": "Creates child sessions for subagents (parentID set to current session), streams subagent tool updates back to parent via Bus subscription + ctx.metadata, enforces max_delegation_depth, and returns task metadata in output."
+        },
+        {
+          "file": "packages/opencode/src/session/index.ts",
+          "notes": "Session Info includes parentID and depth; createNext computes depth for subagent sessions and persists session metadata."
+        },
+        {
+          "file": "packages/opencode/src/provider/native/session-store.ts",
+          "notes": "Persists SDK session IDs per OpenCode session to resume Claude Agent SDK conversations across requests."
+        }
+      ],
+      "prior_art": [],
+      "patterns": [
+        "Provider-executed tool calls (Claude Agent SDK) are surfaced as stream events and mapped into MessageV2.ToolPart state transitions.",
+        "Tool progress and metadata updates flow through Session.updatePart + Bus (message.part.updated) events.",
+        "Tool-bridge pre-creates ToolParts to enable ctx.metadata() during provider-side tool execution, with buffering for out-of-order metadata updates.",
+        "Subagent sessions are modeled as child sessions (parentID, depth) and reported back to the parent via Task tool metadata updates."
+      ],
+      "raw_options": [
+        "Trace tool call progress by subscribing to MessageV2.Event.PartUpdated during a live Claude SDK session to validate events emitted for tool lifecycle states.",
+        "Map Claude SDK stream event variants (tool_use/tool_result/tool_use_summary/tool_progress) to internal ToolPart updates and document where metadata is dropped.",
+        "Verify subagent parent-child propagation by following TaskTool -> SessionPrompt.prompt -> Bus subscriptions to see how child tool calls surface in the parent session.",
+        "Compare AI SDK tool execution path vs Claude SDK path to identify divergences in state updates and metadata handling.",
+        "Check ToolMetadataRegistry usage (currently store-only) and identify where metadata retrieval should be wired for tool_use_summary enrichment.",
+        "Review toModelMessages tool serialization to understand what the client can see for pending/running tool calls."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T16:35:41Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

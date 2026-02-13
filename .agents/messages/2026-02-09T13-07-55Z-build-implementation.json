@@ -1,0 +1,56 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented WI-01 timeout path baseline tests",
+    "data": {
+      "work_item": "wi-01-timeout-path-test.md",
+      "files_changed": [
+        "packages/opencode/test/provider/timeout-paths.test.ts",
+        ".agents/sdlc/reviewing/wi-01-timeout-path-test.md"
+      ],
+      "files_added": [
+        "packages/opencode/test/provider/timeout-paths.test.ts"
+      ],
+      "tests_added": [
+        "packages/opencode/test/provider/timeout-paths.test.ts"
+      ],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "not_run"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "Test file at packages/opencode/test/provider/timeout-paths.test.ts",
+          "status": "met"
+        },
+        {
+          "criterion": "No timeout configured path has no AbortSignal.timeout and keeps timeout: false",
+          "status": "met"
+        },
+        {
+          "criterion": "Numeric timeout path adds AbortSignal.timeout and combines with existing signal",
+          "status": "met"
+        },
+        {
+          "criterion": "timeout=false path skips AbortSignal.timeout and preserves existing signals",
+          "status": "met"
+        },
+        {
+          "criterion": "All three tests pass with bun test test/provider/timeout-paths.test.ts",
+          "status": "met"
+        }
+      ],
+      "notes": "Implemented a local file:// provider harness that captures the wrapped fetch from provider.ts and validates runtime signal behavior for each timeout config path without refactoring production code.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T13:07:55Z",
+    "work_item": "wi-01-timeout-path-test.md",
+    "parent_packet": null
+  }
+}

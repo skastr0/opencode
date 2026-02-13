@@ -1,0 +1,48 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Normalized SDK tool names in the native stream and aligned tests",
+    "data": {
+      "work_item": "align-sdk-tool-names.md",
+      "files_changed": [
+        "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+        "packages/opencode/test/provider/native/claude-agent-sdk.test.ts"
+      ],
+      "files_added": [],
+      "tests_added": [],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "pass"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "SDK native tool calls display with OpenCode's rich TUI components",
+          "status": "met"
+        },
+        {
+          "criterion": "Tool names are normalized consistently throughout the system",
+          "status": "met"
+        },
+        {
+          "criterion": "No breaking changes to existing tool execution",
+          "status": "met"
+        },
+        {
+          "criterion": "mcp_opencode_task already works - preserve that pattern",
+          "status": "met"
+        }
+      ],
+      "notes": "Added SDK_TOOL_NAME_MAP handling in native stream normalization and updated native stream tests to expect lowercase tool names. Root-level test run failed due to repo guard; reran in packages/opencode.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T03:17:45Z",
+    "work_item": "align-sdk-tool-names.md",
+    "parent_packet": "2026-01-26T03-25-00-review-findings.json"
+  }
+}

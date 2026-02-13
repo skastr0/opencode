@@ -1,0 +1,36 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Work item complete: SDK tool names aligned with OpenCode TUI",
+    "data": {
+      "work_item": "align-sdk-tool-names.md",
+      "decision": "Work item completed successfully",
+      "rationale": "All acceptance criteria met. SDK native tools now normalize to lowercase names matching OpenCode TUI registrations.",
+      "from_phase": "reviewing",
+      "to_phase": "done",
+      "files_changed": [
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts",
+        "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+        "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts",
+        "packages/opencode/test/provider/native/claude-agent-sdk.test.ts",
+        "packages/opencode/src/session/llm.ts",
+        "packages/opencode/test/session/llm-native-session.test.ts",
+        "packages/opencode/test/preload.ts"
+      ],
+      "validation": {
+        "tests": "All 49 tests pass",
+        "typecheck": "No type errors",
+        "review": "Passed - no blocking issues"
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T11:00:00Z",
+    "work_item": "align-sdk-tool-names.md",
+    "parent_packet": "2026-01-26T03-17-45Z-build-implementation.json",
+    "blocking": false
+  }
+}

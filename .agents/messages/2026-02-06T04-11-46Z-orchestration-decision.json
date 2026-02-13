@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Learning extraction completed after review pass",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Ran learnings-analyst and captured follow-up backlog improvements",
+      "rationale": "Feature completed successfully with non-blocking review suggestions; extracting reusable patterns and follow-up items increases future cycle speed.",
+      "from_phase": "done",
+      "to_phase": "done",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T04:11:46Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T04-07-53Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

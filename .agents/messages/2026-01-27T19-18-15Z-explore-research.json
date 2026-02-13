@@ -1,0 +1,93 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: thinking option error with opencode/kimi-k2.5",
+    "data": {
+      "original_input": "Investigate error when the thinking option is used with opencode/kimi-k2.5, focusing on thinking config, kimi-specific handling, model/provider config, and agent-specific thinking.",
+      "codebase_findings": [
+        {
+          "topic": "Agent-level thinking config and validation",
+          "details": "Thinking options are validated via Config.Thinking (effort, budgetTokens) and referenced in Config.Agent. Agent loader copies the config into Agent.Info. LLM resolves agent.thinking into a ThinkingEffort and builds provider-specific thinking options for Anthropic/Bedrock/OpenAI/Azure/Copilot/Google/OpenRouter only; openai-compatible (opencode) is not handled, so agent thinking does not map to request options there.",
+          "refs": [
+            "packages/opencode/src/config/config.ts",
+            "packages/opencode/src/agent/agent.ts",
+            "packages/opencode/src/session/thinking-effort.ts",
+            "packages/opencode/src/session/llm.ts"
+          ]
+        },
+        {
+          "topic": "Thinking effort via model variants",
+          "details": "Model variants are auto-generated only when model.capabilities.reasoning is true. For @ai-sdk/openai-compatible, variants map to reasoningEffort (low/medium/high). TUI/CLI store a per-model variant (labeled as thinking effort) and LLM merges variant options into request options.",
+          "refs": [
+            "packages/opencode/src/provider/transform.ts",
+            "packages/opencode/src/provider/provider.ts",
+            "packages/opencode/src/cli/cmd/tui/context/local.tsx",
+            "packages/opencode/src/session/llm.ts",
+            "packages/opencode/src/session/prompt.ts",
+            "packages/opencode/test/provider/provider.test.ts"
+          ]
+        },
+        {
+          "topic": "Kimi-specific thinking handling",
+          "details": "ProviderTransform has Kimi-specific defaults: temperature for kimi-k2 and k2.* (k2.5) and topP for kimi-k2.5. The only explicit thinking enablement for Kimi is a chat_template_args.enable_thinking flag applied when providerID is opencode and model id is kimi-k2-thinking (or glm-4.6).",
+          "refs": [
+            "packages/opencode/src/provider/transform.ts"
+          ]
+        },
+        {
+          "topic": "opencode provider and Kimi model definitions",
+          "details": "Bundled models snapshot defines provider opencode with npm @ai-sdk/openai-compatible and base URL https://opencode.ai/zen/v1. In the snapshot, opencode includes kimi-k2 (reasoning: false) and kimi-k2-thinking (reasoning: true, interleaved reasoning_content). No kimi-k2.5 appears in the bundled snapshot; if it exists at runtime, it comes from live models.dev data.",
+          "refs": [
+            "packages/opencode/src/provider/models.ts",
+            "packages/opencode/src/provider/models-snapshot.ts",
+            "packages/opencode/src/provider/provider.ts"
+          ]
+        },
+        {
+          "topic": "Interleaved reasoning mapping",
+          "details": "For models with interleaved reasoning fields, ProviderTransform normalizes assistant messages by lifting reasoning parts into providerOptions.openaiCompatible.<reasoning_field> and removing reasoning parts from content. This is the mechanism used for models like kimi-k2-thinking that mark interleaved reasoning_content.",
+          "refs": [
+            "packages/opencode/src/provider/transform.ts"
+          ]
+        },
+        {
+          "topic": "OpenAI-compatible reasoning handling",
+          "details": "The openai-compatible responses adapter only treats OpenAI o*/gpt-5/codex models as reasoning models; other model IDs are non-reasoning and will not include a reasoning object in request bodies, even if reasoningEffort is set. This can lead to reasoningEffort being ignored for non-OpenAI model IDs.",
+          "refs": [
+            "packages/opencode/src/provider/sdk/openai-compatible/src/responses/openai-responses-language-model.ts"
+          ]
+        }
+      ],
+      "prior_art": [
+        {
+          "summary": "Earlier exploration documents agent frontmatter fields, including thinking, and notes unknown keys moved into options.",
+          "refs": [
+            ".agents/messages/2026-01-25T21-01-17Z-explore-research.json"
+          ]
+        }
+      ],
+      "patterns": [
+        "Thinking can come from two places: agent.thinking (provider-mapped options) and model variants (reasoning effort).",
+        "Kimi thinking enablement is currently special-cased only for kimi-k2-thinking via chat_template_args on the opencode provider.",
+        "opencode is an openai-compatible provider, so provider-specific options must map to openai-compatible expectations to take effect.",
+        "Bundled models snapshot may be stale; new model IDs (like kimi-k2.5) may only exist in live models.dev data."
+      ],
+      "raw_options": [
+        "Inspect live models.dev (or cached models.json) to confirm opencode/kimi-k2.5 definition and reasoning/interleaved flags.",
+        "Reproduce the error with opencode/kimi-k2.5 + thinking effort enabled and capture request options/body to see which parameter triggers the failure.",
+        "Check whether opencode/kimi-k2.5 needs chat_template_args.enable_thinking (similar to kimi-k2-thinking) and whether that is missing.",
+        "Temporarily disable variants or mark k2.5 as non-reasoning to see if the error disappears (quick hypothesis test).",
+        "Verify providerOptions key mapping for openai-compatible (opencode) to ensure thinking-related options reach the provider.",
+        "Compare behavior with opencode/kimi-k2 vs opencode/kimi-k2-thinking to isolate which thinking path causes the error."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-27T19-18-15Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

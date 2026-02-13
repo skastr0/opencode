@@ -1,0 +1,52 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented Claude Agent SDK translation unit tests",
+    "data": {
+      "work_item": "claude-agent-sdk-translate-tests.md",
+      "files_changed": [
+        ".agents/sdlc/building/claude-agent-sdk-translate-tests.md"
+      ],
+      "files_added": [
+        "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts"
+      ],
+      "tests_added": [
+        "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts"
+      ],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "pass"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "translateToSDKPrompt tests cover text, tool results, ordering, multimodal, and empty prompts",
+          "status": "met"
+        },
+        {
+          "criterion": "createSDKStreamTransformer tests cover system init, text/tool/thinking blocks, partials, errors, usage cache metrics, and abort",
+          "status": "met"
+        },
+        {
+          "criterion": "ClaudeAgentSDKSessionStore tests cover set/get, model invalidation, and touch updates",
+          "status": "met"
+        },
+        {
+          "criterion": "Tests run via bun test test/provider/sdk/claude-agent-sdk/translate.test.ts",
+          "status": "met"
+        }
+      ],
+      "notes": "Added unit tests for prompt translation, stream transformer event mapping, and session store touch timing. Typecheck and lint scripts were run.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T19:38:09Z",
+    "work_item": "claude-agent-sdk-translate-tests.md",
+    "parent_packet": null,
+    "blocking": false
+  }
+}

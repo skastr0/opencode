@@ -1,0 +1,90 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented diff pane for selected changes file",
+    "data": {
+      "work_item": "04-diff-pane.md",
+      "files_changed": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx",
+        "packages/opencode/src/file/index.ts",
+        "packages/opencode/src/server/routes/file.ts",
+        "packages/sdk/js/src/v2/gen/sdk.gen.ts",
+        "packages/sdk/js/src/v2/gen/types.gen.ts",
+        "packages/sdk/openapi.json",
+        ".agents/sdlc/reviewing/04-diff-pane.md"
+      ],
+      "files_added": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/diff-pane.tsx",
+        ".agents/messages/2026-02-06T03-50-54Z-build-implementation.json"
+      ],
+      "tests_added": [],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "not run"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "DiffPane component created at packages/opencode/src/cli/cmd/tui/routes/changes/diff-pane.tsx",
+          "status": "met"
+        },
+        {
+          "criterion": "When a file is selected in the FileList, DiffPane fetches and renders its diff",
+          "status": "met"
+        },
+        {
+          "criterion": "Uses the existing <diff> element with proper theme colors",
+          "status": "met"
+        },
+        {
+          "criterion": "View mode is adaptive split/unified and honors diff_style",
+          "status": "met"
+        },
+        {
+          "criterion": "Shows file path header",
+          "status": "met"
+        },
+        {
+          "criterion": "Stage selection staged/unstaged controls fetched diff",
+          "status": "met"
+        },
+        {
+          "criterion": "Handles added files",
+          "status": "met"
+        },
+        {
+          "criterion": "Handles deleted files",
+          "status": "met"
+        },
+        {
+          "criterion": "Handles binary files",
+          "status": "met"
+        },
+        {
+          "criterion": "Diff pane is scrollable",
+          "status": "met"
+        },
+        {
+          "criterion": "Empty state shown when no file selected",
+          "status": "met"
+        },
+        {
+          "criterion": "bun run typecheck passes",
+          "status": "met"
+        }
+      ],
+      "notes": "Extended /file/content with optional stage query and updated File.read(file, stage?) to use git diff --cached / git diff -- for accurate staged vs unstaged results. Regenerated SDK after schema change. Kept changes scoped to diff pane and stage-aware diff retrieval.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:50:54Z",
+    "work_item": "04-diff-pane.md",
+    "parent_packet": "2026-02-06T12-00-00-commit-plan.json",
+    "blocking": false
+  }
+}

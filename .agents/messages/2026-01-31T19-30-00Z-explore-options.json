@@ -1,0 +1,52 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Understand OpenCode's plugin system (loading, hooks, auth integration, MCP support, config/secrets handling) well enough to reason about how to add or debug plugins and auth flows.",
+      "constraints": [
+        "No code changes or implementation plans in explore phase",
+        "Prefer fastest path to learning and visible confirmation",
+        "Use existing repo artifacts and local configuration patterns"
+      ],
+      "options": [
+        {
+          "name": "Inspect built-in plugin packages",
+          "approach": "Locate the installed built-in plugin packages (opencode-anthropic-auth, opencode-gitlab-auth) and read their exports to confirm module format, auth hook usage, and any manifest conventions beyond the core SDK types.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Real-world plugin module shape, auth hook patterns used outside core, and any implicit conventions not captured in types.",
+          "risk_if_wrong": "Low; only read-only inspection.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Run a minimal local plugin smoke test",
+          "approach": "Create a minimal plugin in a .opencode/plugins directory, start OpenCode, and confirm load order, hook invocation, and tool registration behavior via logs or tool listing.",
+          "time_to_learning": "2-4 hours",
+          "what_we_learn": "Runtime behavior (installation, import, hook call order), and how plugin tooling behaves in practice.",
+          "risk_if_wrong": "Low-to-medium; requires runtime setup and may hit local environment issues.",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Exercise MCP auth flow end-to-end",
+          "approach": "Configure a sample MCP remote server with OAuth, run the CLI auth flow, and verify storage/refresh behavior in mcp-auth.json and MCP status transitions.",
+          "time_to_learning": "2-4 hours",
+          "what_we_learn": "Practical MCP OAuth flow behavior, how tokens and client registrations are stored, and where failures surface.",
+          "risk_if_wrong": "Medium; depends on an accessible MCP server and auth provider.",
+          "reversibility": "high",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it is the fastest confirmation of real plugin export/manifest conventions and auth patterns without needing runtime setup."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-31T19:30:00Z",
+    "work_item": null,
+    "parent_packet": "2026-01-31T19-30-00Z-explore-research.json"
+  }
+}

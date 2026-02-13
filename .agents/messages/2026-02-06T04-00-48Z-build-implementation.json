@@ -1,0 +1,85 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented buffered line comments and submit-to-prompt flow in Changes route",
+    "data": {
+      "work_item": "06-line-comments.md",
+      "files_changed": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/diff-pane.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/footer.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/format-comments.ts",
+        "packages/opencode/test/cli/tui/changes-format-comments.test.ts"
+      ],
+      "files_added": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/format-comments.ts",
+        "packages/opencode/test/cli/tui/changes-format-comments.test.ts"
+      ],
+      "tests_added": [
+        "packages/opencode/test/cli/tui/changes-format-comments.test.ts"
+      ],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "not run (no root lint script)"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "Start comment for specific file+stage+line anchor while viewing diff",
+          "status": "met"
+        },
+        {
+          "criterion": "Comment text input appears for authoring",
+          "status": "met"
+        },
+        {
+          "criterion": "Comments stored in local in-memory store with file/stage/line/text",
+          "status": "met"
+        },
+        {
+          "criterion": "Deterministic keyboard path for explicit line selection",
+          "status": "met"
+        },
+        {
+          "criterion": "Commented anchors visibly indicated in review UI",
+          "status": "met"
+        },
+        {
+          "criterion": "Footer shows comment count",
+          "status": "met"
+        },
+        {
+          "criterion": "Shift+S submits buffered comments",
+          "status": "met"
+        },
+        {
+          "criterion": "Submit formats structured review comment block",
+          "status": "met"
+        },
+        {
+          "criterion": "Submit appends prompt text without auto-send and returns to prompt editing",
+          "status": "met"
+        },
+        {
+          "criterion": "Shows 'No comments to submit' toast on empty submit",
+          "status": "met"
+        },
+        {
+          "criterion": "bun run typecheck passes",
+          "status": "met"
+        }
+      ],
+      "notes": "Implemented explicit line selection through DialogPrompt and line anchor extraction from parsed patch hunks. Submit uses existing route initialPrompt prefill behavior to append text and return to editable prompt flow.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T04:00:48Z",
+    "work_item": "06-line-comments.md",
+    "parent_packet": "2026-02-06T12-00-00-commit-plan.json"
+  }
+}

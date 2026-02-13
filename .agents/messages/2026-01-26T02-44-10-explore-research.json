@@ -1,0 +1,42 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: Anthropic claude-agent-sdk tool calls stuck running",
+    "data": {
+      "original_input": "Tool calls in the Anthropic agents SDK integration stay in running status until the session ends, then they are marked aborted. Hypothesis: SDK not emitting streaming tool updates or OpenCode not handling them.",
+      "codebase_findings": [
+        "LLM stream path for providerID claude-agent-sdk bypasses ai-sdk and uses streamClaudeNative (packages/opencode/src/session/llm.ts).",
+        "streamClaudeNative maps SDK messages via processSDKMessage; tool completion only emitted on tool_use_summary when summary is present and no tool-error path is emitted (packages/opencode/src/provider/native/claude-agent-sdk.ts).",
+        "SessionProcessor marks tool parts running on tool-call and expects tool-result/tool-error to finish; at stream end it marks any pending/running tool as error 'Tool execution aborted' (packages/opencode/src/session/processor.ts).",
+        "translate-stream has more robust tool handling: emits tool-result even if summary missing, emits tool-error on is_error, and pulls ToolMetadataRegistry for rich metadata (packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts).",
+        "tool-bridge uses ToolMetadataRegistry because SDK tool handlers often do not receive tool_use_id, so metadata is keyed by (toolName, input) for later retrieval (packages/opencode/src/provider/sdk/claude-agent-sdk/tool-bridge.ts, packages/opencode/src/provider/sdk/claude-agent-sdk/tool-metadata-registry.ts).",
+        "MessageV2 converts pending/running tool parts to error output in model messages to avoid dangling tool_use blocks (packages/opencode/src/session/message-v2.ts)."
+      ],
+      "prior_art": [
+        ".agents/sdlc/done/claude-agent-sdk-streaming.md",
+        ".agents/sdlc/done/claude-agent-sdk-tool-integration-design.md"
+      ],
+      "patterns": [
+        "Tool status lifecycle: tool-input-start -> tool-call (running) -> tool-result/tool-error (completed).",
+        "If completion events never arrive, SessionProcessor marks tool parts as aborted at stream end.",
+        "Native claude-agent-sdk stream handling is less complete than translate-stream and likely diverged over time."
+      ],
+      "raw_options": [
+        "Emit tool-result on tool_use_summary even when summary is missing; also emit tool-error when is_error/error present, mirroring translate-stream.",
+        "Reuse ToolMetadataRegistry in native stream path to populate tool result metadata/attachments and improve tool completion fidelity.",
+        "Handle tool_use_summary/tool_progress payload variants (tool_use_ids, is_error) and default output text to close tool calls.",
+        "Port translate-stream tool handling into native stream path (shared helper) to avoid drift.",
+        "Switch claude-agent-sdk streaming to use the ai-sdk LanguageModel (createClaudeAgentSDK) instead of streamClaudeNative.",
+        "Add temporary logging of raw SDK message payloads to confirm which tool events are emitted and with which fields."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T02:44:10Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

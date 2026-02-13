@@ -1,0 +1,26 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Regressing to building phase - native stream missing normalization",
+    "data": {
+      "work_item": "align-sdk-tool-names.md",
+      "decision": "Move back to building to address review findings",
+      "rationale": "Review found that claude-agent-sdk.ts (native stream) also needs tool name normalization. Need to apply consistent normalization across both translate-stream.ts and claude-agent-sdk.ts",
+      "from_phase": "reviewing",
+      "to_phase": "building",
+      "blocking_issues": [
+        "claude-agent-sdk.ts missing SDK_TOOL_NAME_MAP normalization",
+        "Native tests expect unnormalized names"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T10:30:00Z",
+    "work_item": "align-sdk-tool-names.md",
+    "parent_packet": "2026-01-26T03-09-17Z-build-implementation.json",
+    "blocking": false
+  }
+}

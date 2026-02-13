@@ -1,0 +1,69 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented Enrich File.status() to separate staged vs unstaged changes",
+    "data": {
+      "work_item": "01-file-status-staged-unstaged.md",
+      "files_changed": [
+        "packages/opencode/src/file/index.ts",
+        "packages/sdk/openapi.json",
+        "packages/sdk/js/src/v2/gen/types.gen.ts"
+      ],
+      "files_added": [],
+      "tests_added": [],
+      "validation_results": {
+        "tests": "not_run",
+        "types": "pass",
+        "lint": "not_run"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "File.Info schema has optional stage field",
+          "status": "met"
+        },
+        {
+          "criterion": "File.status uses separate staged and unstaged numstat commands",
+          "status": "met"
+        },
+        {
+          "criterion": "Files present in both staged and unstaged appear as separate entries",
+          "status": "met"
+        },
+        {
+          "criterion": "Untracked files get stage: untracked",
+          "status": "met"
+        },
+        {
+          "criterion": "Deleted files are stage annotated correctly",
+          "status": "met"
+        },
+        {
+          "criterion": "/file/status remains backward compatible and now includes stage",
+          "status": "met"
+        },
+        {
+          "criterion": "SDK regenerated after schema change",
+          "status": "met"
+        },
+        {
+          "criterion": "bun run typecheck passes",
+          "status": "met"
+        },
+        {
+          "criterion": "Consumers ignoring stage continue to work",
+          "status": "met"
+        }
+      ],
+      "notes": "Kept the contract additive by making stage optional. Deleted entries are classified per-stage using separate diff-filter=D queries and deduplicated against numstat results.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:35:33Z",
+    "work_item": "01-file-status-staged-unstaged.md",
+    "parent_packet": "2026-02-06T12-00-00-commit-plan.json"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "from": "commitment-analyst",
+  "to": "orchestrator-engineer",
+  "phase": "commit",
+  "type": "plan",
+  "content": {
+    "summary": "Implementation plan for: Provider Quota Widget in TUI Sidebar",
+    "data": {
+      "goal": "Display provider-level quota consumption (rate limits, usage caps, reset times) in the TUI sidebar so users have visibility into their API capacity without leaving opencode.",
+      "learning_milestone": "After implementation, users can see their remaining quota percentage and reset time in the sidebar while working. Success is measured by: (1) accurate quota display for Anthropic and OpenRouter providers, (2) no disruption to sidebar when quota API fails, (3) reasonable API call frequency (<=1 per minute).",
+      "approach": "Three-phase implementation following the existing codebase patterns. First, create a ProviderQuota service in the provider folder that fetches and normalizes quota data from different provider APIs (Anthropic OAuth, OpenRouter API key). Second, add a QuotaWidget component to the sidebar that consumes this data and displays it consistently with existing sections. Third, add caching with 60-second TTL and graceful error handling to ensure the sidebar remains stable even when quota APIs are unavailable. The implementation leverages existing Auth module for tokens and follows SolidJS reactive patterns already in sidebar.tsx.",
+      "changes_required": [
+        {"file": "packages/opencode/src/provider/quota.ts", "change": "Create new file with ProviderQuota namespace containing QuotaInfo type, fetch() for each provider, and fetchCached() with TTL caching"},
+        {"file": "packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx", "change": "Add QuotaWidget component after Context section, integrate with sync.data.provider for reactive updates"}
+      ],
+      "challenges": {
+        "technical": [
+          {
+            "challenge": "Provider API response formats vary significantly",
+            "why_hard": "Anthropic returns percentage-based usage buckets, OpenRouter returns credit balances in USD, Gemini uses 0.0-1.0 scale",
+            "mitigation": "Define unified QuotaInfo type that normalizes all formats to percentage + reset time + optional cost fields"
+          },
+          {
+            "challenge": "OAuth token refresh for Anthropic",
+            "why_hard": "Access tokens expire and need refresh; the sidebar shouldn't handle auth flows",
+            "mitigation": "Return null when token invalid, let user re-authenticate via existing /connect flow"
+          }
+        ],
+        "resourcing": {
+          "estimated_effort": "7 hours total",
+          "dependencies": ["Existing Auth module (already in place)", "SolidJS reactive primitives (already used in sidebar)"],
+          "skills_required": ["TypeScript", "SolidJS", "REST API integration", "TUI component patterns"],
+          "risk_factors": ["Provider API changes (mitigated by opencode-bar as reference)", "Rate limiting from providers (mitigated by 60s cache TTL)"]
+        },
+        "open_questions": [
+          "Should quota be fetched on sidebar mount or lazily on first render?",
+          "Should there be a manual refresh button in future iterations?",
+          "How to handle multiple accounts for same provider (out of scope per work item, but may surface)"
+        ]
+      },
+      "testing_strategy": {
+        "unit": [
+          "QuotaInfo type normalization for each provider response format",
+          "Cache TTL behavior (stale data returned, fresh fetch triggered)",
+          "Error handling returns null without throwing"
+        ],
+        "integration": [
+          "Sidebar renders without error when quota service returns null",
+          "Sidebar updates when provider changes",
+          "Cache prevents duplicate API calls within TTL window"
+        ]
+      },
+      "risks": [
+        {"risk": "Provider API endpoints change without notice", "mitigation": "Reference opencode-bar for known-working patterns; fail gracefully to null"},
+        {"risk": "Quota API rate limits hit under heavy use", "mitigation": "60-second cache TTL prevents more than 1 call/minute per provider"},
+        {"risk": "OAuth token expiration mid-session", "mitigation": "Return null and display '--'; user can re-auth via /connect"}
+      ],
+      "work_items": ["quota-service.md", "quota-widget.md", "quota-cache.md"]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-01T19:45:00Z",
+    "work_item": "provider-quota-widget.md",
+    "parent_packet": null
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Narrowed debugger MVP scope to codelldb-only",
+    "data": {
+      "work_item": "rust-dap-debugger-plugin-research.md",
+      "decision": "Drop adapter fallbacks and multi-adapter abstractions for MVP",
+      "rationale": "User prioritized reduced scope and straightforward implementation with essential debugger capabilities only",
+      "from_phase": "exploring",
+      "to_phase": "exploring",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-13T12:41:07Z",
+    "work_item": "rust-dap-debugger-plugin-research.md",
+    "blocking": false
+  }
+}

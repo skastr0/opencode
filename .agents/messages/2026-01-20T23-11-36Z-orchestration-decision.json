@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Enter review for request logging changes",
+    "data": {
+      "work_item_id": "debug-opus-bad-requests",
+      "decision": "Dispatch review for instrumentation changes",
+      "rationale": "Build complete; verify logging safety and adherence to requirements.",
+      "from_phase": "building",
+      "to_phase": "reviewing",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T23:11:36Z",
+    "work_item": "debug-opus-bad-requests.md",
+    "parent_packet": "2026-01-20T23-08-34Z-build-implementation.json",
+    "blocking": false
+  }
+}

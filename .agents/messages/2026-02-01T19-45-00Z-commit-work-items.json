@@ -1,0 +1,73 @@
+{
+  "from": "commitment-analyst",
+  "to": "orchestrator-engineer",
+  "phase": "commit",
+  "type": "work-items",
+  "content": {
+    "summary": "Work items generated from commit plan for Provider Quota Widget",
+    "data": {
+      "work_items": [
+        {
+          "id": "quota-service",
+          "filename": "quota-service.md",
+          "title": "Provider Quota Service",
+          "description": "Core service for fetching and normalizing quota data from provider APIs (Anthropic, OpenRouter)",
+          "acceptance_criteria": [
+            "Create packages/opencode/src/provider/quota.ts with ProviderQuota namespace",
+            "Define QuotaInfo type with quota-based and pay-as-you-go fields",
+            "Implement ProviderQuota.fetch(providerID) using Auth.get() for tokens",
+            "Implement Anthropic fetcher (api.anthropic.com/api/oauth/usage)",
+            "Implement OpenRouter fetcher (openrouter.ai/api/v1/credits)"
+          ],
+          "dependencies": [],
+          "estimated_effort": "3 hours",
+          "order": 1
+        },
+        {
+          "id": "quota-widget",
+          "filename": "quota-widget.md",
+          "title": "Sidebar Quota Widget Component",
+          "description": "TUI component displaying quota info in sidebar with reactive updates",
+          "acceptance_criteria": [
+            "Create QuotaWidget component showing usage %, reset time, weekly cost",
+            "Integrate into sidebar.tsx after Context section",
+            "Use theme system for consistent styling with color coding by quota level",
+            "Reactive updates on provider change and message send",
+            "Loading state ('Quota: ...') and fallback state ('Quota: --')"
+          ],
+          "dependencies": ["quota-service"],
+          "estimated_effort": "2 hours",
+          "order": 2
+        },
+        {
+          "id": "quota-cache",
+          "filename": "quota-cache.md",
+          "title": "Quota Caching and Error Handling",
+          "description": "Resilience layer with TTL caching and graceful error handling",
+          "acceptance_criteria": [
+            "Implement in-memory cache with 60-second default TTL",
+            "fetchCached() returns cached data within TTL, else fetches fresh",
+            "Network/auth/rate-limit errors return null, never throw",
+            "Add debug logging via Log.create({ service: 'provider-quota' })",
+            "Widget shows '--' fallback when service returns null"
+          ],
+          "dependencies": ["quota-service"],
+          "estimated_effort": "2 hours",
+          "order": 3
+        }
+      ],
+      "total_items": 3,
+      "total_estimated_effort": "7 hours",
+      "build_order": "quota-service -> (quota-widget, quota-cache) in parallel possible but sequential recommended",
+      "parent_work_item": {
+        "id": "provider-quota-widget",
+        "location": ".agents/sdlc/committed/provider-quota-widget.md"
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-01T19:45:00Z",
+    "work_item": "provider-quota-widget.md",
+    "parent_packet": "2026-02-01T19-45-00Z-commit-plan.json"
+  }
+}

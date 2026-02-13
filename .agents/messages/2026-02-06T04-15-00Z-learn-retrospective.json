@@ -1,0 +1,158 @@
+{
+  "from": "learnings-analyst",
+  "to": "all",
+  "phase": "learn",
+  "type": "retrospective",
+  "content": {
+    "summary": "Retrospective on git-review-ui: full /changes route with file navigation, stage-aware diffs, line comments, and submit-to-prompt",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "sub_items": [
+        "01-file-status-staged-unstaged.md",
+        "02-changes-route-scaffold.md",
+        "03-file-list-sidebar.md",
+        "04-diff-pane.md",
+        "05-changes-footer.md",
+        "06-line-comments.md"
+      ],
+      "outcome": {
+        "success": true,
+        "acceptance_criteria_met": true,
+        "acceptance_criteria_count": "56/56 across 6 work items",
+        "learning_milestone_achieved": true,
+        "learning_milestone": "User can /changes → navigate → diff → comment → submit-to-prompt end-to-end",
+        "review_verdict": "PASS with non-blocking suggestions",
+        "time_estimate_accuracy": "pessimistic",
+        "predicted_time": "10 hours (commit plan) / 4-8 hours (explore option 1)",
+        "actual_time": "~65 minutes wall-clock (03:02Z → 04:08Z)",
+        "delta": "~9x faster than plan estimate due to orchestrated parallelism and focused work items"
+      },
+      "surprises": [
+        "Commit plan scope initially narrower than explore findings — orchestrator post-commit review caught 3 misalignments before build started",
+        "WI-04 (diff pane) required server-side /file/content extension and SDK regeneration — 8 files changed vs expected 2-3 for a 'UI component'",
+        "<diff> opentui element confirmed no line-level interaction API — the pre-identified risk materialized and the planned fallback (DialogPrompt line selection) worked smoothly",
+        "Wall-clock time was ~9x faster than estimate — parallelized build waves and specific acceptance criteria enabled autonomous builder completion without clarification rounds"
+      ],
+      "patterns": {
+        "worked": [
+          {
+            "pattern": "Parallel explore probes with different focus areas",
+            "why": "Dispatching codebase feasibility + upstream PR analysis in parallel gave rich decision surface in minutes and caught opentui#621 dependency risk before any code was written",
+            "example": "Explorer 1 mapped File.status/File.read/diff rendering. Explorer 2 analyzed anomalyco/opencode#12188 and opentui#621 dependency."
+          },
+          {
+            "pattern": "Orchestrator post-commit review against explore context",
+            "why": "Catches scope drift between explore findings and committed plan before expensive build phase",
+            "example": "Orchestrator found commit plan deferred directory grouping, staged diffs, and had auto-send vs append-to-prompt wrong — all corrected before build started"
+          },
+          {
+            "pattern": "Dependency-aware parallel build waves",
+            "why": "Maximizes throughput while preventing cross-file merge conflicts. Compressed 6 sequential items into 4 effective build steps.",
+            "example": "Wave 1: WI-01+WI-02 (independent). Serial: WI-03. Wave 2: WI-04+WI-05 (orthogonal UI slices). Serial: WI-06 (integrator)."
+          },
+          {
+            "pattern": "Additive optional schema fields for backward compatibility",
+            "why": "Adding optional stage field to File.Info meant zero breakage for existing consumers. No migration, no feature flags.",
+            "example": "stage: z.enum(['staged','unstaged','untracked']).optional() — existing callers just ignore it"
+          },
+          {
+            "pattern": "Pure formatting functions as testable islands",
+            "why": "format-comments.ts was naturally testable because it's pure. It attracted the only unit test in the feature and the review specifically requested more coverage for it.",
+            "example": "format-comments.ts: Comment[] → string, tested in changes-format-comments.test.ts"
+          },
+          {
+            "pattern": "Explicit acceptance criteria with mandatory typecheck gate",
+            "why": "Every work item required 'bun run typecheck passes' — this caught integration errors at each step. 100% criteria met without builder needing clarification.",
+            "example": "56 acceptance criteria across 6 items, all marked [x] with validation notes"
+          },
+          {
+            "pattern": "Holistic review for integrated feature sets",
+            "why": "Reviewing all 6 items as a batch caught cross-cutting issues (sequential git commands, what/how braid) that per-item review would miss",
+            "example": "Review found: parallel git commands, conditional diff fetch, client-side diff synthesis — all cross-item concerns"
+          },
+          {
+            "pattern": "ReturnTo route pattern for stateless navigation",
+            "why": "Simple field on route type solves back-navigation without a history stack or persistent state",
+            "example": "ChangesRoute = { type: 'changes', returnTo?: HomeRoute | SessionRoute }"
+          }
+        ],
+        "didnt_work": [
+          {
+            "anti_pattern": "Commit plan scope narrower than explore findings",
+            "why": "Different agents (explorer vs commitment-analyst) can have different interpretations of scope. The commit plan deferred items the explore phase identified as requirements.",
+            "example": "Directory grouping and staged diff viewing deferred in plan but identified as user requirements in explore"
+          },
+          {
+            "anti_pattern": "Underestimating server-side plumbing for 'UI' work items",
+            "why": "WI-04 was titled 'Build the diff viewing pane' but required extending /file/content query schema, modifying File.read(), and regenerating SDK",
+            "example": "8 files changed including server route, file module, SDK gen types — the 'UI component' touched 3 backend layers"
+          },
+          {
+            "anti_pattern": "No tests on 5 of 6 work items",
+            "why": "Acceptance criteria only required typecheck, so builders didn't add tests. Review flagged missing coverage.",
+            "example": "tests: not_run on WI-01 through WI-05. Only WI-06 had a test because it had an extractable pure function."
+          },
+          {
+            "anti_pattern": "Client-side diff synthesis in UI component",
+            "why": "makeDiff() in diff-pane.tsx mixes rendering with data transformation — a what/how braid",
+            "example": "DiffPane creates synthetic diffs for added/untracked files instead of receiving them from backend"
+          },
+          {
+            "anti_pattern": "Sequential subprocess calls shipped without parallelization",
+            "why": "5 independent git commands run sequentially in File.status() — known latency issue deferred for speed of delivery",
+            "example": "git diff --cached, git diff, git ls-files, git diff --name-only (x2) all await sequentially"
+          }
+        ],
+        "heuristics": [
+          "When explore and commit are done by different agents, always have the orchestrator validate commit scope against explore findings before approving build start",
+          "When a work item title says 'UI component' but the diff pane needs data the backend doesn't provide yet, scope the server changes into the same work item — don't pretend it's UI-only",
+          "When parallelizing build waves, the dependency graph determines maximum safe parallelism — never parallelize items that touch the same files",
+          "For data model enrichments, always prefer additive optional fields over breaking changes — zero migration cost, zero rollback risk",
+          "Include 'unit test for pure functions' in acceptance criteria, not just typecheck — typecheck doesn't catch logic bugs",
+          "When an explore phase identifies a risk with a known fallback, document both in the work item — builders can execute the fallback immediately without re-exploring",
+          "Holistic review beats per-item review for features with shared state or cross-cutting concerns",
+          "Wall-clock estimates for orchestrated parallel builds should be 3-5x lower than serial estimates — parallelism + focused scope dramatically compresses cycle time"
+        ]
+      },
+      "extractions": {
+        "skills_created": [],
+        "skills_updated": [],
+        "docs_created": [],
+        "docs_updated": [],
+        "backlog_items_created": [
+          "parallelize-git-status-commands.md",
+          "move-diff-synthesis-to-backend.md",
+          "cap-untracked-file-reads.md",
+          "conditional-stage-diff-fetch.md",
+          "sanitize-comment-text.md",
+          "extract-filelist-grouping-logic.md",
+          "add-missing-format-comments-tests.md"
+        ]
+      },
+      "orchestration_heuristics_update": {
+        "explore_phase": [
+          "Parallel probes with different focus areas (codebase feasibility + external prior art) produce higher-quality option ranking than sequential exploration",
+          "When upstream PRs exist, always dispatch a dedicated probe to evaluate reuse potential and dependency risks"
+        ],
+        "commit_phase": [
+          "After commit-plan is generated, validate scope against explore options before approving build — different agents can interpret scope differently",
+          "For UI features requiring new data, include server-side plumbing in the same work item as the component that consumes it — don't split across items unless the server change has independent value"
+        ],
+        "build_phase": [
+          "Safe parallelism = items that don't touch the same files. Two build waves with 2 parallel items each compressed 6 items from ~10h serial to ~1h wall-clock.",
+          "Include 'unit test for pure functions' in acceptance criteria — pure functions are the highest-ROI test targets and builders will write them if asked"
+        ],
+        "review_phase": [
+          "For integrated features (3+ work items sharing state/files), use holistic review, not per-item review",
+          "Non-blocking review findings should generate follow-up backlog items automatically to ensure they're tracked"
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T04:15:00Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T01-30-00-review-findings.json",
+    "blocking": false
+  }
+}

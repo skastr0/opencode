@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Starting build phase with safe parallelization",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Run WI-01 (git status staging model) and WI-02 (changes route scaffold) in parallel; keep downstream items sequential based on dependencies",
+      "rationale": "WI-01 and WI-02 are independent and unblock all remaining UI work. Parallelizing only these gives speedup without introducing merge complexity in the same modules.",
+      "from_phase": "committed",
+      "to_phase": "building",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:31:47Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T03-27-32Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

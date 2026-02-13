@@ -1,0 +1,89 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for opencode model integration and configuration",
+    "data": {
+      "original_input": "Explore the opencode system to understand: 1. How opencode integrates with AI models (OpenAI, Claude, etc.) 2. The architecture around model invocation and configuration 3. How model parameters are currently set (hardcoded, config files, environment variables, API calls) 4. Whether there's a configuration layer where users can tweak model settings 5. How different model backends are selected and configured",
+      "codebase_findings": [
+        {
+          "area": "Model catalog + defaults",
+          "details": "Providers/models are seeded from models.dev (cached locally, optionally fetched). Each model includes capabilities (temperature/reasoning/tool-call), limits, and variants; the cache can be disabled via flags or overridden via local JSON.",
+          "files": [
+            "packages/opencode/src/provider/models.ts:9",
+            "packages/opencode/src/provider/models-macro.ts:1"
+          ]
+        },
+        {
+          "area": "Provider registry + backend selection",
+          "details": "Provider.state merges models.dev data with config overrides, env keys, auth store, plugin auth, and custom loaders; providers can be enabled/disabled by config. getSDK builds an ai-sdk provider (bundled or installed), applies baseURL/apiKey/headers/timeout, then getLanguage resolves a model instance via provider-specific loaders.",
+          "files": [
+            "packages/opencode/src/provider/provider.ts:667",
+            "packages/opencode/src/provider/provider.ts:956",
+            "packages/opencode/src/provider/provider.ts:1049"
+          ]
+        },
+        {
+          "area": "Model invocation pipeline",
+          "details": "LLM.stream uses Vercel AI SDK streamText with providerOptions derived from ProviderTransform; it merges base options, model options, agent options, and selected model variant. It also builds thinking/reasoning options and chooses max output tokens.",
+          "files": [
+            "packages/opencode/src/session/llm.ts:47",
+            "packages/opencode/src/session/llm.ts:95",
+            "packages/opencode/src/provider/transform.ts:80",
+            "packages/opencode/src/provider/transform.ts:480"
+          ]
+        },
+        {
+          "area": "Configuration layers",
+          "details": "Config loads (1) remote .well-known configs, (2) global config, (3) custom config path/content, (4) project opencode.json/c, plus .opencode dirs. Provider config supports model overrides, variants, baseURL/apiKey/timeout, and allow/deny lists; agent config supports model/temperature/top_p/options/thinking.",
+          "files": [
+            "packages/opencode/src/config/config.ts:38",
+            "packages/opencode/src/config/config.ts:803",
+            "packages/opencode/src/config/config.ts:538"
+          ]
+        },
+        {
+          "area": "User-facing model selection",
+          "details": "CLI flags (`--model`, `--variant`) and config fields (`model`, `small_model`) choose provider/model. Provider.defaultModel uses config if present, otherwise picks the highest-priority model from available providers; `opencode models` lists models from the provider registry.",
+          "files": [
+            "packages/opencode/src/cli/cmd/run.ts:57",
+            "packages/opencode/src/provider/provider.ts:1111",
+            "packages/opencode/src/cli/cmd/models.ts:9"
+          ]
+        },
+        {
+          "area": "Verbosity / reasoning controls",
+          "details": "ProviderTransform sets OpenAI text verbosity (textVerbosity) for GPT-5, reasoningEffort/reasoningSummary for OpenAI/Azure, and thinkingConfig/thinking options for Google/Anthropic/Bedrock. The OpenAI responses adapter maps text.verbosity into the request body. Thinking effort can be auto-detected from user prompts (think hard/ultrathink) or set per-agent.",
+          "files": [
+            "packages/opencode/src/provider/transform.ts:528",
+            "packages/opencode/src/provider/sdk/openai-compatible/src/responses/openai-responses-language-model.ts:255",
+            "packages/opencode/src/session/thinking-effort.ts:7",
+            "packages/opencode/src/session/llm.ts:98"
+          ]
+        }
+      ],
+      "prior_art": [],
+      "patterns": [
+        "Layered config overrides (remote → global → project → inline)",
+        "Provider registry merges models.dev defaults with config/env/auth/plugin sources",
+        "Model params resolved by merging provider defaults + model options + agent options + variant options",
+        "Per-provider custom loaders adapt API quirks (OpenAI responses, Azure completions, Cloudflare gateway)"
+      ],
+      "raw_options": [
+        "Create a concise architecture diagram of provider/model flow",
+        "Trace a single provider end-to-end with concrete config examples",
+        "Map all user-configurable model parameters into a settings matrix",
+        "Validate model selection precedence (CLI vs config vs default) with a quick run",
+        "Inventory provider-specific env vars and auth requirements in one table",
+        "Document reasoning/verbosity controls and which providers support them"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-15T15-36-52Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

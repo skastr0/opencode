@@ -1,0 +1,67 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: mcp_opencode_task tool execution flow",
+    "data": {
+      "original_input": "Explore how the mcp_opencode_task tool works, including task tool definition, subagent execution, result flow, and MCP server integration.",
+      "codebase_findings": [
+        {
+          "finding": "Task tool definition with parameter schema, permission gating, session creation, metadata updates, and output packaging (includes <task_metadata> session_id).",
+          "location": "packages/opencode/src/tool/task.ts"
+        },
+        {
+          "finding": "Subtask execution path: SessionPrompt.loop detects subtask parts, creates a tool part, invokes TaskTool.execute with bypassAgentCheck, then marks tool part completed or error.",
+          "location": "packages/opencode/src/session/prompt.ts"
+        },
+        {
+          "finding": "Subtask part schema contains prompt, description, agent, optional model, and command fields.",
+          "location": "packages/opencode/src/session/message-v2.ts"
+        },
+        {
+          "finding": "Subtask parts are created when commands are executed with subtask enabled; prompt text extracted from resolvePromptParts.",
+          "location": "packages/opencode/src/command/index.ts"
+        },
+        {
+          "finding": "Session depth is computed at creation time (parent depth + 1) and used to gate delegation depth in TaskTool.",
+          "location": "packages/opencode/src/session/index.ts"
+        },
+        {
+          "finding": "MCP tools are listed and keyed as sanitized client + '_' + tool name (e.g., opencode_task).",
+          "location": "packages/opencode/src/mcp/index.ts"
+        },
+        {
+          "finding": "OpenCode tools (including task) are exposed to the Claude Agent SDK via an MCP server; MCP tools from external servers are re-exposed with a 'mcp_' prefix (mcp_opencode_task).",
+          "location": "packages/opencode/src/provider/native/tool-bridge.ts"
+        },
+        {
+          "finding": "Claude Agent SDK wiring uses mcpServers.opencode and allows mcp__opencode__* tools; it normalizes tool names back to OpenCode IDs.",
+          "location": "packages/opencode/src/provider/native/claude-agent-sdk.ts"
+        }
+      ],
+      "prior_art": [
+        "No prior packets found in .agents/messages (directory was empty)."
+      ],
+      "patterns": [
+        "Tool.define + ToolRegistry used to expose tools to runtime and MCP bridges.",
+        "Subagent execution modeled as child Session with parentID and depth.",
+        "Progress surfaced through MessageV2.ToolPart updates via Bus events.",
+        "MCP tool naming is derived from client/tool names and then re-prefixed when bridged to SDKs."
+      ],
+      "raw_options": [
+        "Run a minimal Task invocation to observe real metadata updates and tool naming in a live session.",
+        "Trace where tool metadata summaries are rendered/consumed in UI/SDK to see what progress is visible.",
+        "Add a structured progress channel for subagent text/step updates (beyond tool parts).",
+        "Unify or document tool name normalization (mcp_opencode_task vs mcp__opencode__task vs task) to reduce confusion.",
+        "Return structured task metadata separately from text to avoid parsing <task_metadata> blocks."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T16:41:03Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

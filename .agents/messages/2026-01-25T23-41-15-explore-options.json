@@ -1,0 +1,52 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Tool calls routed through Claude Agent SDK (MCP) are translated into Vercel AI SDK stream parts, but Vercel AI SDK still manages tool execution/validation. This dual-path causes tool call display issues and potential mismatches in tool names/IDs and output content.",
+      "constraints": [
+        "Cannot implement code changes in explore phase",
+        "Tool display depends on MessageV2.ToolPart creation via tool-input-start/tool-call/tool-result",
+        "Claude Agent SDK executes tools (providerExecuted=true) while Vercel AI SDK still sees tools/activeTools"
+      ],
+      "options": [
+        {
+          "name": "Trace the tool-call lifecycle end-to-end",
+          "approach": "Add targeted logging or debug traces (translate-stream, LLM.stream, SessionProcessor) to capture tool_use_id/toolCallId/toolName/providerExecuted and confirm where IDs/names diverge and which events are missing.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Exact breakpoints where tool-call display fails (missing tool-input-start, mismatched IDs, or providerExecuted handling).",
+          "risk_if_wrong": "Low; only adds observability",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Bypass Vercel AI SDK tool handling for Claude Agent SDK",
+          "approach": "Prototype a path that streams Claude Agent SDK outputs directly without passing tools/activeTools to streamText, or uses a no-tools mode while still consuming tool-call/tool-result events from translate-stream.",
+          "time_to_learning": "0.5-1 day",
+          "what_we_learn": "Whether the display issue is caused by Vercel AI SDK’s tool management pipeline or by Claude SDK event shaping.",
+          "risk_if_wrong": "Medium; could affect non-Claude providers if not scoped",
+          "reversibility": "medium",
+          "rank": 2
+        },
+        {
+          "name": "Preserve tool names via stub tools",
+          "approach": "Keep Vercel AI SDK but register per-tool stubs (matching Claude tool names) or adjust experimental_repairToolCall to avoid mapping to _providerExecuted so display keeps original tool names.",
+          "time_to_learning": "0.5 day",
+          "what_we_learn": "Whether display breakage is due to tool name remapping/validation failures rather than missing results.",
+          "risk_if_wrong": "Medium; could affect validation behavior",
+          "reversibility": "medium",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it yields the fastest, lowest-risk clarity on where tool calls are dropped or renamed, which informs whether to bypass Vercel AI SDK or adjust stubs/remapping."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:41:15Z",
+    "work_item": null,
+    "parent_packet": "2026-01-25T23-41-15-explore-research.json"
+  }
+}

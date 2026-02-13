@@ -1,0 +1,30 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "update-report",
+    "data": {
+      "what_done": "Traced the child-session navigation path to see why a primary agent can appear after cycling from a subagent session.",
+      "approach_taken": "Reviewed the session child-cycle handler and how it computes the list of sessions to navigate.",
+      "challenges_faced": "The symptom looks like an agent mismatch but is actually a navigation target mismatch.",
+      "how_solved": "Found moveChild includes the parent session in its cycle list, so the next step can be the parent session.",
+      "evidence": {
+        "files": [
+          "packages/opencode/src/cli/cmd/tui/routes/session/index.tsx"
+        ],
+        "tests": [],
+        "metrics": {}
+      },
+      "reasoning": "Cycling siblings should not include the parent; when it does, the UI correctly shows the primary agent since it is the parent session.",
+      "next_steps": [
+        "Decide whether to exclude the parent from child cycling or adjust the UI label to reflect actual behavior."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T17:54:30Z",
+    "priority": "low",
+    "blocking": false
+  }
+}

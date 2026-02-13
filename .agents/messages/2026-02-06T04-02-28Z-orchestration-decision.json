@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Build wave completed with dependency-aware parallelization",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Executed two parallelizable waves (WI-01+WI-02, then WI-04+WI-05) with WI-03 and WI-06 serialized by dependencies",
+      "rationale": "This is the maximum safe parallelization under current dependency graph while avoiding cross-file thrash and preserving phase coherence.",
+      "from_phase": "building",
+      "to_phase": "reviewing",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T04:02:28Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T03-44-10Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented Claude Agent SDK tool bridge and tool event translation.",
+    "data": {
+      "work_item": "claude-agent-sdk-tool-bridge.md",
+      "files_changed": [
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/claude-agent-sdk-model.ts",
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts",
+        "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts"
+      ],
+      "files_added": [
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/tool-bridge.ts"
+      ],
+      "tests_added": [
+        "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts"
+      ],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "not run"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "Claude's native tools (Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch) work",
+          "status": "met"
+        },
+        {
+          "criterion": "Claude's Task, Todo, AskUser, PlanMode tools are disabled",
+          "status": "met"
+        },
+        {
+          "criterion": "OpenCode's Task tool is available via mcp__opencode__task",
+          "status": "met"
+        },
+        {
+          "criterion": "Subagent sessions are tracked in OpenCode (visible in UI)",
+          "status": "met"
+        },
+        {
+          "criterion": "OpenCode plugin tools are available",
+          "status": "met"
+        },
+        {
+          "criterion": "OpenCode-configured MCP tools are available",
+          "status": "met"
+        },
+        {
+          "criterion": "Streaming works correctly",
+          "status": "met"
+        },
+        {
+          "criterion": "Skills from ~/.claude and .claude work",
+          "status": "met"
+        }
+      ],
+      "notes": "Stream translator now emits tool_progress/tool_use_summary events as tool-call/tool-result, and the SDK model registers an in-process MCP server that wraps OpenCode tools and MCP passthrough. Manual provider run not executed.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T21:48:04Z",
+    "work_item": "claude-agent-sdk-tool-bridge.md",
+    "parent_packet": null
+  }
+}

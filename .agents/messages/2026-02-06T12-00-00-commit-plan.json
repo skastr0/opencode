@@ -1,0 +1,117 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "plan",
+  "content": {
+    "summary": "Implementation plan for: Git Review UI with live project git state, file sidebar, diff viewing, and line commenting",
+    "data": {
+      "goal": "Add a /changes route to the TUI that shows live staged+unstaged git changes with file navigation, adaptive diff rendering, and buffered line comments that submit into the prompt.",
+      "learning_milestone": "A user can type /changes, navigate files, see diffs, add a comment to a line, press S, and see the formatted comment appear in their chat prompt ready to send. If this flow works end-to-end, the architecture is validated.",
+      "approach": "We add a new route type ('changes') to the existing SolidJS routing system, create a new route folder at routes/changes/ containing 4-5 components (index, file-list, diff-pane, footer, format-comments), and enrich the existing File.status() server endpoint to distinguish staged vs unstaged changes.\n\nThe diff rendering reuses the existing <diff> opentui element already used throughout the session route — no new rendering primitives needed. The file list fetches data from the SDK client, which talks to the enriched /file/status endpoint.\n\nLine commenting is stored in a local createStore (in-memory, not persisted) and formatted into a structured text block on submit. Submit navigates back to home/session with the formatted comments as initialPrompt, leveraging the existing PromptInfo pattern.\n\nThis approach keeps all new code under routes/changes/ (4 new files) with minimal touches to existing files (route.tsx, app.tsx, file/index.ts, server/routes/file.ts). This minimizes fork conflicts with upstream.",
+      "changes_required": [
+        {"file": "packages/opencode/src/file/index.ts", "change": "Add optional 'stage' field to File.Info schema; split File.status() into staged+unstaged git commands"},
+        {"file": "packages/opencode/src/server/routes/file.ts", "change": "No code changes needed — schema change propagates automatically"},
+        {"file": "packages/opencode/src/cli/cmd/tui/context/route.tsx", "change": "Add ChangesRoute type to Route union"},
+        {"file": "packages/opencode/src/cli/cmd/tui/app.tsx", "change": "Add <Match> for 'changes' route; register /changes slash command"},
+        {"file": "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx", "change": "NEW: Main Changes route component with layout (sidebar + diff pane + footer)"},
+        {"file": "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx", "change": "NEW: File list sidebar with staged/unstaged grouping and keyboard navigation"},
+        {"file": "packages/opencode/src/cli/cmd/tui/routes/changes/diff-pane.tsx", "change": "NEW: Diff viewing pane using existing <diff> element"},
+        {"file": "packages/opencode/src/cli/cmd/tui/routes/changes/footer.tsx", "change": "NEW: Footer with summary stats and keybind hints"},
+        {"file": "packages/opencode/src/cli/cmd/tui/routes/changes/format-comments.ts", "change": "NEW: Pure function to format comment array into prompt text"}
+      ],
+      "challenges": {
+        "technical": [
+          {
+            "challenge": "Line-level cursor tracking in <diff> element",
+            "why_hard": "The <diff> opentui element renders diffs but may not expose which line the user's cursor is on. There's no documented API for line-level interaction callbacks on the diff element.",
+            "mitigation": "Fallback approach: prompt user for line number when pressing 'c', or comment on the visible hunk. Alternatively, wrap diff lines in individual box elements with click handlers — but this changes the rendering approach significantly. Start with hunk-level or prompted-line commenting for MVP."
+          },
+          {
+            "challenge": "Staged vs unstaged diff content from File.read()",
+            "why_hard": "The existing File.read() endpoint generates diff by running 'git diff' then falling back to 'git diff --staged'. It doesn't parameterize which diff to show. A staged file might show the wrong diff.",
+            "mitigation": "For MVP, the combined diff (working tree vs HEAD) is acceptable and matches what most users expect. If needed later, add a 'ref' query parameter to File.read() to specify --cached. Don't block on this."
+          },
+          {
+            "challenge": "Route navigation state preservation",
+            "why_hard": "When navigating from session → changes → session, we need to return to the correct session. The current route system doesn't have a history stack.",
+            "mitigation": "Store returnTo route in ChangesRoute type. On Escape, navigate to returnTo (or home as fallback). Simple and sufficient."
+          }
+        ],
+        "resourcing": {
+          "estimated_effort": "8-12 hours across 6 work items",
+          "dependencies": [
+            "SDK regeneration after File.Info schema change (automated via ./script/generate.ts)",
+            "Understanding of <diff> opentui element capabilities (may need to inspect opentui source for line interaction APIs)"
+          ],
+          "skills_required": [
+            "SolidJS reactive patterns (signals, stores, memos, effects)",
+            "OpenTUI element model (box, scrollbox, text, diff)",
+            "Git CLI commands for staged/unstaged/untracked distinction",
+            "Existing opencode TUI patterns (routes, commands, dialogs, themes)"
+          ],
+          "risk_factors": [
+            "The <diff> element's line interaction capabilities are unknown — may need to explore opentui source",
+            "Large diff files could cause performance issues in the scrollbox",
+            "Fork conflicts if upstream touches route.tsx or app.tsx between now and merge"
+          ]
+        },
+        "open_questions": [
+          "Does the <diff> opentui element support any form of line-level click/cursor callbacks? If not, what's the simplest way to know which line the user is looking at?",
+          "Should the /changes route be accessible from both home and session routes, or only session?",
+          "Should comments persist across route changes (e.g., stored in KV) or is in-memory sufficient for MVP?",
+          "Should the file list support filtering/searching, or is scroll-based navigation enough for v1?"
+        ]
+      },
+      "testing_strategy": {
+        "unit": [
+          "format-comments.ts: pure function, test with various comment arrays (empty, single, multi-file, special characters)",
+          "File.status() enrichment: test that staged, unstaged, and untracked files get correct stage values (requires git repo fixture)"
+        ],
+        "integration": [
+          "Manual TUI testing: launch opencode, type /changes, verify file list loads, select a file, see diff, press c, type comment, press S, verify prompt is populated",
+          "Typecheck: bun run typecheck must pass after all changes",
+          "Route roundtrip: navigate home → /changes → Escape → verify returns to home; navigate session → /changes → Escape → verify returns to session"
+        ]
+      },
+      "risks": [
+        {"risk": "opentui <diff> element has no line interaction API", "mitigation": "Fall back to hunk-level commenting or line-number prompt dialog. This reduces UX quality but doesn't block the feature."},
+        {"risk": "File.read() diff content doesn't match staged state", "mitigation": "Accept combined diff for MVP; add --cached parameter support as a fast follow-up."},
+        {"risk": "Upstream changes to route.tsx or app.tsx cause merge conflicts", "mitigation": "Keep changes to these files minimal (3-5 lines each). The bulk of new code is in routes/changes/ which won't conflict."},
+        {"risk": "Performance with large repos (hundreds of changed files)", "mitigation": "Use scrollbox with virtualization if opentui supports it; otherwise, cap displayed files at 100 with a 'show all' option."}
+      ],
+      "work_items": [
+        "01-file-status-staged-unstaged.md",
+        "02-changes-route-scaffold.md",
+        "03-file-list-sidebar.md",
+        "04-diff-pane.md",
+        "05-changes-footer.md",
+        "06-line-comments.md"
+      ],
+      "scope_decisions": {
+        "included_now": [
+          "Staged/unstaged/untracked file distinction in File.status()",
+          "New /changes route with file sidebar + diff pane + footer",
+          "Adaptive split/unified diff based on terminal width",
+          "Line commenting (buffered in memory)",
+          "Submit comments to prompt",
+          "Keyboard navigation (arrows, enter, escape, c, S)"
+        ],
+        "deferred": [
+          "File tree grouping by directory (flat list is fine for v1)",
+          "Comment persistence across route changes",
+          "File filtering/search in the sidebar",
+          "Inline diff annotations (slottable-diff style) — explicitly out of scope per requirements",
+          "Staged-specific diff viewing (--cached parameter on File.read())",
+          "Auto-refresh on file system changes (manual refresh via keybind is sufficient)",
+          "Git staging/unstaging from the UI"
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T12:00:00Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": null
+  }
+}

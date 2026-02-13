@@ -1,0 +1,70 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Tool calls from the claude-agent-sdk provider remain in running status because completion events are not mapped to tool-result/tool-error, so SessionProcessor aborts them when the stream ends.",
+      "constraints": [
+        "Explore phase only: no implementation or work items.",
+        "claude-agent-sdk currently uses streamClaudeNative instead of ai-sdk streamText.",
+        "Tool lifecycle is driven by stream events in SessionProcessor."
+      ],
+      "options": [
+        {
+          "name": "Harden tool_use_summary handling in native stream",
+          "approach": "Update processSDKMessage to treat any tool_use_summary as completion (even without summary), emit tool-error when is_error/error fields are present, and default output text when summary is missing. Optionally pull ToolMetadataRegistry for metadata/title to match translate-stream behavior.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Whether tool_use_summary events are arriving but ignored due to missing summary/error mapping; validates completion mapping quickly.",
+          "risk_if_wrong": "Tools may still hang if the SDK never emits tool_use_summary at all.",
+          "reversibility": "high",
+          "implementation_complexity": "low",
+          "risk_level": "low",
+          "code_locations": [
+            "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+            "packages/opencode/src/provider/sdk/claude-agent-sdk/tool-metadata-registry.ts"
+          ],
+          "rank": 1
+        },
+        {
+          "name": "Unify native stream parsing with translate-stream",
+          "approach": "Refactor streamClaudeNative to reuse the translate-stream tool handling (or extract a shared helper) so tool_progress/tool_use_summary paths and error handling stay in sync with the SDK LanguageModel implementation.",
+          "time_to_learning": "3-5 hours",
+          "what_we_learn": "Whether the drift between native and translate-stream is the root cause; reduces future regressions.",
+          "risk_if_wrong": "Refactor could introduce regressions in text/reasoning streaming without resolving missing events.",
+          "reversibility": "medium",
+          "implementation_complexity": "medium",
+          "risk_level": "medium",
+          "code_locations": [
+            "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+            "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts"
+          ],
+          "rank": 2
+        },
+        {
+          "name": "Route claude-agent-sdk through ai-sdk LanguageModel path",
+          "approach": "Remove the native stream branch in LLM.stream for claude-agent-sdk and let streamText use createClaudeAgentSDK (LanguageModelV2) so streaming and tool handling follow the standard ai-sdk pipeline.",
+          "time_to_learning": "4-8 hours",
+          "what_we_learn": "Whether the custom native stream is the primary source of tool lifecycle issues; standard pipeline reliability.",
+          "risk_if_wrong": "Behavioral change in tool execution and streaming semantics; higher chance of new regressions.",
+          "reversibility": "medium",
+          "implementation_complexity": "high",
+          "risk_level": "high",
+          "code_locations": [
+            "packages/opencode/src/session/llm.ts",
+            "packages/opencode/src/provider/sdk/claude-agent-sdk/claude-agent-sdk-model.ts"
+          ],
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it is the fastest way to confirm and fix a likely mapping gap (tool_use_summary without summary/error handling) with minimal surface area changes."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T02:44:10Z",
+    "work_item": null,
+    "parent_packet": "2026-01-26T02-44-10-explore-research.json"
+  }
+}

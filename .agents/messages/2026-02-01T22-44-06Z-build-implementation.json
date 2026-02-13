@@ -1,0 +1,34 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented Provider Quota Service fetchers and tests",
+    "data": {
+      "work_item": "quota-service.md",
+      "files_changed": ["packages/opencode/src/provider/quota.ts", "packages/opencode/src/provider/quota.test.ts"],
+      "files_added": ["packages/opencode/src/provider/quota.ts", "packages/opencode/src/provider/quota.test.ts"],
+      "tests_added": ["packages/opencode/src/provider/quota.test.ts"],
+      "validation_results": {
+        "tests": "pass",
+        "types": "not_run",
+        "lint": "not_run"
+      },
+      "acceptance_criteria_status": [
+        {"criterion": "Create packages/opencode/src/provider/quota.ts with ProviderQuota namespace", "status": "met"},
+        {"criterion": "Define QuotaInfo type with required fields", "status": "met"},
+        {"criterion": "Implement ProviderQuota.fetch(providerID: string): Promise<QuotaInfo | null>", "status": "met"},
+        {"criterion": "Implement Anthropic fetcher", "status": "met"},
+        {"criterion": "Implement OpenRouter fetcher", "status": "met"}
+      ],
+      "notes": "Added normalization helpers and provider-specific fetchers; tests cover exports and unsupported provider handling.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-01T22:44:06Z",
+    "work_item": "quota-service.md",
+    "parent_packet": "2026-02-01T19-45-00Z-commit-plan.json"
+  }
+}

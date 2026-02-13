@@ -1,0 +1,59 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for Claude Agent SDK V2 MCP server configuration and why in-process MCP tools are missing.",
+    "data": {
+      "original_input": "Research: Claude Agent SDK V2 MCP Server Configuration. OpenCode MCP tools are missing in V2; investigate unstable_v2_createSession/mcpServers handling and recommend a fix.",
+      "codebase_findings": [
+        {
+          "source": "node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts",
+          "detail": "SDKSessionOptions for V2 includes model/path/env/allowedTools/disallowedTools/permissionMode but no mcpServers (see SDKSessionOptions definition)."
+        },
+        {
+          "source": "node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs",
+          "detail": "V2 session constructor initializes internal query with mcpServers: {} and strictMcpConfig: false, indicating V2 does not wire MCP servers into the session (minified U9 constructor)."
+        },
+        {
+          "source": "node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts",
+          "detail": "V1 Options for query include mcpServers?: Record<string, McpServerConfig>; McpServerConfig supports stdio/sse/http and in-process SDK servers (McpSdkServerConfigWithInstance)."
+        },
+        {
+          "source": "node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts",
+          "detail": "Query interface exposes setMcpServers(), which supports SDK (in-process) servers and process-based servers; this is the supported dynamic MCP API."
+        },
+        {
+          "source": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+          "detail": "OpenCode passes mcpServers and allowedTools into unstable_v2_createSession, but the V2 SDK ignores mcpServers (not in SDKSessionOptions)."
+        },
+        {
+          "source": "node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts",
+          "detail": "createSdkMcpServer returns a McpSdkServerConfigWithInstance (type: 'sdk', name, instance) which is intended for Query.setMcpServers or Options.mcpServers in V1."
+        }
+      ],
+      "prior_art": [
+        "No prior explore/learn packets found in .agents/messages."
+      ],
+      "patterns": [
+        "V2 session API is a minimal wrapper over a CLI process and does not accept MCP server configs; MCP config is only supported in the V1 query API.",
+        "In-process MCP servers are supported by the SDK only through McpSdkServerConfigWithInstance and Query.setMcpServers (V1).",
+        "Passing mcpServers into unstable_v2_createSession has no effect; MCP servers must be configured via V1 APIs or external CLI configuration."
+      ],
+      "raw_options": [
+        "Use V1 query() API with options.mcpServers or Query.setMcpServers to register the in-process OpenCode MCP server.",
+        "Adapt current V2 session wrapper to build on query() and feed a message stream to emulate sessions while using setMcpServers.",
+        "Keep V2 but move MCP server to an external process (stdio/http/sse) and configure it via Claude Code settings, not in-process.",
+        "Fork/patch claude-agent-sdk to add mcpServers to SDKSessionOptions and wire through to the internal Query/setMcpServers path.",
+        "Create a local plugin that registers MCP servers at startup via settings, then keep V2 unchanged.",
+        "Switch to a V1-compatible integration path for tool calling while keeping V2 for model messaging (hybrid)."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T01:34:20Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

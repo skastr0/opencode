@@ -1,0 +1,93 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "plan",
+  "content": {
+    "summary": "Implementation plan for: instrument request/error logging first to debug Opus bad requests while preserving provider variant and thinking alignment.",
+    "data": {
+      "goal": "Add structured, redacted request and error logging in the LLM pipeline so Opus bad requests can be diagnosed without changing provider behavior.",
+      "learning_milestone": "A single failed Opus request yields logs that show provider/model, variant, thinking options (effort + budget), sanitized request metadata, and error response details to pinpoint the invalid parameter combination.",
+      "approach": "Start in packages/opencode/src/session/llm.ts where request options are assembled and streamText is called. Add a small, pure helper to build a sanitized log payload that records provider/model identifiers, variant name, thinking config summary, maxOutputTokens, message/tool counts, and header presence without logging prompt text, file contents, or secrets. Emit the request log at DEBUG level immediately before streamText so it captures the exact payload context used for the call.\n\nExtend error logging inside the streamText onError handler (or wrapper) to capture APICallError metadata, statusCode, response body snippets, and relevant provider headers, reusing the same sanitized request metadata for correlation. Keep logging gated behind DEBUG or ERROR levels, and ensure redaction for Authorization, apiKey, and any inline content.\n\nIncorporate the alignment plan requirement by explicitly validating agent.thinking mapping and default budgets. Ensure buildThinkingOptions continues to map agent.thinking across providers using ThinkingEffort defaults, and preserve the current merge order so upstream model variants and ProviderTransform.variants remain authoritative. Add log fields to show effective thinking/variant options without mutating them.",
+      "changes_required": [
+        {
+          "file": "packages/opencode/src/session/llm.ts",
+          "change": "Add sanitized request logging before streamText and enrich error logging with request context, including variant and thinking metadata."
+        },
+        {
+          "file": "packages/opencode/src/session/thinking-effort.ts",
+          "change": "Confirm default thinking budgets align with provider limits; adjust defaults if needed for alignment and update commentary as required."
+        },
+        {
+          "file": "packages/opencode/test/session/llm.test.ts",
+          "change": "Add unit coverage for the log-sanitization helper and for merge order/variant alignment if new helpers are added."
+        },
+        {
+          "file": "packages/opencode/test/session/thinking-effort.test.ts",
+          "change": "Update budget assertions if defaults change while validating alignment with provider limits."
+        }
+      ],
+      "challenges": {
+        "technical": [
+          "Redacting request data without losing useful debugging context; mitigate by logging counts, sizes, and option summaries instead of raw content.",
+          "Avoiding behavior changes while logging computed options; mitigate by keeping helpers pure and leaving option merge order intact."
+        ],
+        "resourcing": {
+          "estimated_effort": "6 hours",
+          "dependencies": [
+            "Access to a reproducible Opus bad request or representative error payloads.",
+            "Confirmation of provider-specific reasoning/variant expectations from upstream docs or SDK behavior."
+          ],
+          "skills_required": [
+            "TypeScript logging patterns",
+            "AI SDK error types (APICallError)",
+            "Provider option and variant mapping in opencode"
+          ],
+          "risk_factors": [
+            "Limited access to real Opus 400 error responses",
+            "Potential exposure of sensitive data if redaction misses a field",
+            "High log volume if not gated by DEBUG"
+          ]
+        },
+        "open_questions": [
+          "Which Opus request parameters or message shapes trigger the 400 responses?",
+          "Do upstream providers return structured response bodies or headers on these failures?",
+          "Should request logging be gated behind a new flag or remain DEBUG-only?"
+        ]
+      },
+      "testing_strategy": {
+        "unit": [
+          "Add tests for any new log-sanitization helper to ensure prompt content, file data, and auth headers are excluded.",
+          "Add coverage verifying default thinking budgets and variant merge order when agent.thinking is set."
+        ],
+        "integration": [
+          "Run an Opus request locally with DEBUG logging enabled to confirm request and error logs include sanitized context without content leakage."
+        ]
+      },
+      "risks": [
+        {
+          "risk": "Logging may leak sensitive content or API keys.",
+          "mitigation": "Redact headers, tokens, prompt content, and file data; log only counts and metadata; keep at DEBUG."
+        },
+        {
+          "risk": "Variant or thinking options could be unintentionally overridden while adding instrumentation.",
+          "mitigation": "Keep the existing merge order and log effective options without mutating them."
+        },
+        {
+          "risk": "Logs could become too noisy or large for normal usage.",
+          "mitigation": "Keep payload compact and gated behind DEBUG; avoid logging full request bodies."
+        }
+      ],
+      "work_items": [
+        "debug-opus-bad-requests.md",
+        "debug-opus-bad-requests-error-context.md",
+        "debug-opus-bad-requests-thinking-alignment.md"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T22:57:58Z",
+    "work_item": "debug-opus-bad-requests.md",
+    "parent_packet": null
+  }
+}

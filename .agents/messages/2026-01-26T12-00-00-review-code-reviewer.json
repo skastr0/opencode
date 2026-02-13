@@ -1,0 +1,95 @@
+{
+  "from": "code-reviewer",
+  "to": "orchestrator|all",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Review of Claude Agent SDK integration: Robust integration with some style and lifecycle management improvements needed.",
+    "data": {
+      "change_summary": "Integrates @anthropic-ai/claude-agent-sdk as a native provider with a bridged tool execution environment. Handles SDK session state, event mapping, and TUI visualization updates.",
+      "files_reviewed": [
+        "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+        "packages/opencode/src/provider/native/tool-bridge.ts",
+        "packages/opencode/src/provider/native/session-store.ts",
+        "packages/opencode/src/session/llm.ts",
+        "packages/opencode/test/provider/native/claude-agent-sdk.test.ts"
+      ],
+      "context_files": [
+        "packages/opencode/src/provider/provider.ts",
+        "packages/opencode/src/cli/cmd/tui/routes/session/index.tsx"
+      ],
+      "findings": [
+        {
+          "line": 39,
+          "file": "packages/opencode/src/provider/native/tool-bridge.ts",
+          "severity": "HIGH",
+          "category": "reliability",
+          "summary": "Potential memory leak in global pendingUpdates map",
+          "explanation": "The `pendingUpdates` map is global and mutable. If `flushBuffer` logic fails to clear keys (e.g., if a part never arrives), keys will accumulate indefinitely. This is a risk for long-running processes.",
+          "suggestion": "Implement a TTL (Time-To-Live) mechanism or LRU eviction for this map to ensure stale entries are eventually cleaned up."
+        },
+        {
+          "line": 114,
+          "file": "packages/opencode/src/provider/native/tool-bridge.ts",
+          "severity": "MEDIUM",
+          "category": "maintainability",
+          "summary": "Global event subscription without cleanup",
+          "explanation": "`ensurePartSubscription` creates a permanent subscription to `Bus` that is never unsubscribed. In tests or hot-reload scenarios, this could lead to duplicate listeners or side effects.",
+          "suggestion": "Return a cleanup/unsubscribe function and manage the lifecycle of the tool bridge server explicitly, or ensure it's a true singleton with idempotent initialization."
+        },
+        {
+          "line": 348,
+          "file": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+          "severity": "LOW",
+          "category": "style",
+          "summary": "Use of 'let' for global cache",
+          "explanation": "`cachedClaudePath` uses `let` in the global scope. While necessary for caching, it introduces mutable global state.",
+          "suggestion": "Consider wrapping in a singleton object or memoized function to encapsulate the state."
+        },
+        {
+          "line": 443,
+          "file": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+          "severity": "LOW",
+          "category": "style",
+          "summary": "Use of 'else' statements",
+          "explanation": "The `processSDKMessage` function uses `else if` chains (e.g., line 469). The project style guide prefers early returns or switch statements to avoid `else`.",
+          "suggestion": "Refactor into smaller handler functions (e.g., `handleDelta`, `handleContentBlock`) that use early returns."
+        },
+        {
+          "line": 763,
+          "file": "packages/opencode/src/provider/native/tool-bridge.ts",
+          "severity": "LOW",
+          "category": "maintainability",
+          "summary": "Hardcoded tool list",
+          "explanation": "`DISABLED_SDK_TOOLS` contains a hardcoded list of strings. This is brittle if the SDK changes tool names.",
+          "suggestion": "Move to a configuration file or constant definition file that is easier to update."
+        },
+        {
+          "line": 1888,
+          "file": "packages/opencode/src/cli/cmd/tui/routes/session/index.tsx",
+          "severity": "LOW",
+          "category": "correctness",
+          "summary": "Naive diff generation",
+          "explanation": "The unified diff generation manually constructs a header `@@ -1,X +1,Y @@` assuming the full file content is in `oldString`/`newString`. If the SDK passes partial content, this header will be misleading.",
+          "suggestion": "Acceptable for visualization, but consider adding a comment clarifying that this is a synthetic diff for display purposes only."
+        }
+      ],
+      "positive_highlights": [
+        "Strong type safety with helper functions (`asRecord`, etc.) handling the loose typing of SDK messages.",
+        "Comprehensive test suite covering various event stream scenarios and edge cases.",
+        "Clever solution to the 'lost metadata' problem using `ToolMetadataRegistry`.",
+        "Good separation of the native provider logic from the main LLM session loop."
+      ],
+      "overall": {
+        "status": "pass_with_suggestions",
+        "blocking_count": 0,
+        "summary": "A solid implementation that enables key functionality. Attention needed on the `tool-bridge` lifecycle to prevent memory leaks, and minor style adjustments recommended."
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T12:00:00Z",
+    "work_item": "feature-claude-agent-sdk.md",
+    "blocking": false
+  }
+}

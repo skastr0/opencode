@@ -1,0 +1,46 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "work-items",
+  "content": {
+    "summary": "Work items generated from commit plan",
+    "data": {
+      "work_items": [
+        {
+          "filename": "emit-tool-result-on-tool-use-summary.md",
+          "title": "Emit tool-result on tool_use_summary without summary",
+          "acceptance_criteria": [
+            "When tool_use_summary arrives without summary and without error, processSDKMessage emits tool-result with default output text and deletes the tool entry from state.toolCalls.",
+            "When tool_use_summary includes summary, tool-result output uses that summary (no regression from current behavior).",
+            "Tool result output includes normalized toolName and carries input from the registered tool call when available."
+          ],
+          "dependencies": [],
+          "estimated_effort": "1-2 hours",
+          "order": 1
+        },
+        {
+          "filename": "emit-tool-error-on-tool-use-summary.md",
+          "title": "Emit tool-error on tool_use_summary failures",
+          "acceptance_criteria": [
+            "When tool_use_summary indicates an error (is_error true or error field present), processSDKMessage emits tool-error with a human-readable message and removes the tool from state.toolCalls.",
+            "Error cases do not emit tool-result for the same tool id.",
+            "Tool error event includes toolName and input when available."
+          ],
+          "dependencies": [
+            "emit-tool-result-on-tool-use-summary.md"
+          ],
+          "estimated_effort": "1-2 hours",
+          "order": 2
+        }
+      ],
+      "total_items": 2,
+      "total_estimated_effort": "2-4 hours"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T02:48:14Z",
+    "work_item": null,
+    "parent_packet": "2026-01-26T02-48-14Z-commit-plan.json"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Understand how mcp_opencode_task is defined, how it spawns subagents, how results/progress flow back, and identify gaps in progress reporting.",
+      "constraints": [
+        "No code or implementation in explore phase",
+        "Tool naming varies across MCP layers (task vs mcp_opencode_task vs mcp__opencode__task)",
+        "Subagent delegation is capped by config.experimental.max_delegation_depth",
+        "Permission rules can deny task delegation depending on agent config"
+      ],
+      "options": [
+        {
+          "name": "Live trace a single Task invocation",
+          "approach": "Run a controlled subagent task and observe tool name, metadata summary updates, and completion behavior in the session record.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Actual runtime naming (mcp_opencode_task vs mcp__opencode__task), metadata update cadence, and completion signals.",
+          "risk_if_wrong": "Low (no code changes; purely observational).",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Audit metadata consumption paths",
+          "approach": "Locate where tool metadata/summary is rendered or used in UI/SDK to determine what progress is visible to users.",
+          "time_to_learning": "2-4 hours",
+          "what_we_learn": "Whether summary/sessionId data is surfaced and where progress reporting is currently limited.",
+          "risk_if_wrong": "Low (read-only).",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Scope improvements to progress reporting",
+          "approach": "Map required changes across TaskTool, SessionPrompt, and tool-bridge to add richer progress signals (text streaming, step events, explicit completion payloads).",
+          "time_to_learning": "0.5-1 day",
+          "what_we_learn": "Exact integration points and complexity of closing current progress gaps.",
+          "risk_if_wrong": "Medium (design effort without validation).",
+          "reversibility": "medium",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it yields the fastest confirmation of naming, metadata, and completion behavior with minimal effort and no code changes."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T16:41:03Z",
+    "work_item": null,
+    "parent_packet": "2026-01-26T16-41-03-explore-research.json"
+  }
+}

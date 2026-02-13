@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Started deep timeout investigation in explore phase",
+    "data": {
+      "work_item": "investigate-provider-timeout-sleep-wake.md",
+      "decision": "Use full path and dispatch explorer",
+      "rationale": "Issue spans request lifecycle, timeout propagation, and commit-level behavior changes, so multiple plausible causes exist and exploration is needed before commit/build",
+      "from_phase": "new",
+      "to_phase": "exploring",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T12:50:12Z",
+    "work_item": "investigate-provider-timeout-sleep-wake.md",
+    "parent_packet": null,
+    "blocking": false
+  }
+}

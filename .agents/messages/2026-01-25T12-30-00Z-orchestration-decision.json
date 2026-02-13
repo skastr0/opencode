@@ -1,0 +1,21 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Addressing review feedback - adding unit tests",
+    "data": {
+      "work_item": "claude-agent-sdk-provider",
+      "decision": "Add unit tests for translate functions as requested by review",
+      "rationale": "Review passed on implementation quality but requested tests for translate-prompt.ts and translate-stream.ts",
+      "from_phase": "reviewing",
+      "to_phase": "building (brief)",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T12:30:00Z",
+    "work_item": "claude-agent-sdk-provider"
+  }
+}

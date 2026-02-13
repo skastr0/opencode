@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "phase:build",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Advanced to WI-02 fuzzy filter implementation",
+    "data": {
+      "work_item": "02-fuzzy-filter-input.md",
+      "decision": "Build fuzzy filter and keyboard isolation on top of WI-01 row model",
+      "rationale": "WI-01 foundation is in place, so next highest value is quick file narrowing and hotkey conflict prevention while preserving stage and directory context.",
+      "from_phase": "committed",
+      "to_phase": "building",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T21:50:08Z",
+    "work_item": "02-fuzzy-filter-input.md",
+    "parent_packet": "2026-02-06T21-46-53Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

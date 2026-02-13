@@ -1,0 +1,71 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "plan",
+  "content": {
+    "summary": "Implementation plan for: investigate provider timeout sleep/wake behavior via config A/B isolation and error mapping gap tests",
+    "data": {
+      "goal": "Prove (or disprove) that the default no-timeout config path causes indefinite hangs after sleep/wake, and map exact gaps in error classification that prevent proper retry/UX feedback.",
+      "learning_milestone": "After WI-03 completes, we will know: (1) whether the default path truly hangs forever, (2) exactly which error types escape proper classification, (3) whether TimeoutError from AbortSignal.timeout gets retried or surfaces as UnknownError. This tells us whether a default timeout + expanded error handling is the right fix.",
+      "approach": "The provider fetch wrapper in provider.ts:1044-1082 has three timeout paths: no config (no timeout), explicit number (AbortSignal.timeout), explicit false (no timeout). The default path — which all users without custom config hit — provides zero abort protection. After sleep/wake, TCP connections die silently; without AbortSignal.timeout, fetch hangs forever. The error mapping in message-v2.ts:722+ only handles AbortError and ECONNRESET specifically, but TimeoutError (from AbortSignal.timeout) and ETIMEDOUT/EPIPE (from kernel) are not handled. We test each path in isolation, simulate the hang, map the error classification gaps, then produce a fix proposal.",
+      "changes_required": [
+        {"file": "packages/opencode/test/provider/timeout-paths.test.ts", "change": "New test file: proves 3 timeout config paths behave as analyzed"},
+        {"file": "packages/opencode/test/provider/sleep-wake-timeout.test.ts", "change": "New test file: simulates hung fetch, proves hang with no timeout, proves recovery with timeout"},
+        {"file": "packages/opencode/test/provider/error-mapping-timeout.test.ts", "change": "New test file: maps exactly how TimeoutError, ETIMEDOUT, EPIPE are classified through fromError + retryable"},
+        {"file": ".agents/messages/TIMESTAMP-commit-fix-proposal.json", "change": "Fix proposal document with exact changes, risk assessment, and validation plan"}
+      ],
+      "challenges": {
+        "technical": [
+          {
+            "challenge": "Testing fetch wrapper in isolation",
+            "why_hard": "The fetch wrapper is defined inline inside getSDK() closure — not directly exportable. Tests need to either use Instance.provide with a mock server or extract the logic.",
+            "mitigation": "Follow existing test pattern (tmpdir + Instance.provide + config JSON) from provider.test.ts. Alternatively, test the logic by constructing equivalent closures."
+          },
+          {
+            "challenge": "AbortSignal.timeout behavior differences across runtimes",
+            "why_hard": "Bun's AbortSignal.timeout may behave differently from Node.js spec. The DOMException name/message may vary.",
+            "mitigation": "WI-02 will empirically verify what AbortSignal.timeout(N) actually throws in Bun when triggered."
+          },
+          {
+            "challenge": "SystemError construction in tests",
+            "why_hard": "Bun SystemError is not a standard JS Error — it has .code, .syscall, .errno fields. Constructing one in a test may not match real runtime shape.",
+            "mitigation": "Use Object.assign on Error to add .code/.syscall properties, matching what fromError checks."
+          }
+        ],
+        "resourcing": {
+          "estimated_effort": "2.5 hours total (4 work items)",
+          "dependencies": ["Bun runtime (already installed)", "No external API keys needed — all tests use mocked fetch"],
+          "skills_required": ["TypeScript testing with Bun", "AbortController/AbortSignal API", "Understanding of TCP connection lifecycle"],
+          "risk_factors": ["If Bun's AbortSignal.timeout doesn't throw standard DOMException, error classification tests may need adjustment"]
+        },
+        "open_questions": [
+          "Does Bun's fetch with timeout:false genuinely disable ALL timeouts, or does it only disable Bun's default (which may already be infinity)?",
+          "When AbortSignal.timeout fires during an SSE stream (not initial fetch), does the SSE retry logic in serverSentEvents.gen.ts catch it before processor.ts?",
+          "Is there a Bun-specific fetch timeout that applies even when timeout:false is set? (ref: github.com/oven-sh/bun/issues/16682)"
+        ]
+      },
+      "testing_strategy": {
+        "unit": [
+          "WI-01: 3 test cases for timeout config paths",
+          "WI-02: 3 test cases for sleep simulation + error production",
+          "WI-03: 5+ test cases for error classification mapping"
+        ],
+        "integration": [
+          "After fix: manual sleep/wake test with real provider to verify retry behavior"
+        ]
+      },
+      "risks": [
+        {"risk": "Tests may not perfectly simulate real sleep/wake TCP death", "mitigation": "Use never-resolving promises as proxy; document this limitation in test comments"},
+        {"risk": "Fix proposal may conflict with providers that legitimately need infinite timeout (e.g. very long generation)", "mitigation": "Proposal will recommend timeout:false as explicit opt-out, not remove the option"},
+        {"risk": "SSE retry layer may interact with session retry layer causing double-retry", "mitigation": "WI-04 will analyze this interaction explicitly"}
+      ],
+      "work_items": ["wi-01-timeout-path-test.md", "wi-02-abort-signal-sleep-simulation.md", "wi-03-error-mapping-gap-test.md", "wi-04-fix-proposal.md"]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T00:00:00.000Z",
+    "work_item": "investigate-provider-timeout-sleep-wake.md",
+    "parent_packet": null
+  }
+}

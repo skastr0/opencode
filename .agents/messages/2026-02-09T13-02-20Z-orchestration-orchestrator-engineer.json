@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "builder",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Dispatching WI-01 to build phase",
+    "data": {
+      "work_item": "wi-01-timeout-path-test.md",
+      "decision": "Implement baseline tests for provider timeout-path behavior before deeper error mapping work",
+      "rationale": "WI-01 is dependency root for subsequent sleep/wake and error mapping investigations",
+      "from_phase": "committed",
+      "to_phase": "building",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T13:02:20Z",
+    "work_item": "wi-01-timeout-path-test.md",
+    "parent_packet": "2026-02-09T12-57-39Z-orchestration-orchestrator-engineer.json",
+    "blocking": false
+  }
+}

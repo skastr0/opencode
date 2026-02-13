@@ -1,0 +1,77 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: TUI task/subagent rendering and mcp_opencode_task updates",
+    "data": {
+      "original_input": "Explore how the TUI renders task/subagent info and why subagent tool calls (mcp_opencode_task) are not shown or updated in real time.",
+      "codebase_findings": [
+        {
+          "file": "packages/opencode/src/cli/cmd/tui/routes/session/index.tsx",
+          "finding": "Session route renders messages in a scrollbox; AssistantMessage maps parts to TextPart/ReasoningPart/ToolPart; ToolPart dispatches to per-tool renderers. Task tool uses metadata.summary and input.subagent_type to display subagent info and navigate to child session.",
+          "evidence": "ToolPart -> Task component shows description, toolcall count, last non-pending tool, and uses metadata.sessionId for navigation."
+        },
+        {
+          "file": "packages/opencode/src/cli/cmd/tui/context/sync.tsx",
+          "finding": "TUI state is event-driven; sdk.event.listen updates message/part stores on message.part.updated, message.updated, session.updated, etc., which drives re-renders.",
+          "evidence": "Sync store maps parts by messageID and updates on event types, enabling reactive rendering in Session." 
+        },
+        {
+          "file": "packages/opencode/src/cli/cmd/tui/context/sdk.tsx",
+          "finding": "SDK provider subscribes to server SSE via sdk.event.subscribe and batches events into a Solid global emitter for UI updates.",
+          "evidence": "Event queue flushes every ~16ms to batch renders." 
+        },
+        {
+          "file": "packages/opencode/src/tool/task.ts",
+          "finding": "Task tool spawns subagent session, subscribes to MessageV2.PartUpdated for that session, and updates ctx.metadata.summary with tool calls and sessionId for the parent tool part.",
+          "evidence": "Bus.subscribe collects tool parts, marks nested task tools as isSubagent, and calls ctx.metadata with summary/sessionId/model." 
+        },
+        {
+          "file": "packages/opencode/src/session/prompt.ts",
+          "finding": "Subtask execution path creates a Task tool part in the parent session and updates its state/metadata via ctx.metadata during execution; final metadata from Task tool is applied on completion.",
+          "evidence": "taskCtx.metadata updates the running ToolPart state; completion writes title/metadata/output." 
+        },
+        {
+          "file": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+          "finding": "Claude Agent SDK stream normalizes MCP tool names (mcp__opencode__task -> task). Tool_use_summary becomes tool-result metadata with only a summary string; no merge of stored metadata.",
+          "evidence": "normalizeToolName strips mcp__opencode__ prefix; tool_use_summary creates tool-result with metadata { summary } only." 
+        },
+        {
+          "file": "packages/opencode/src/provider/native/tool-bridge.ts",
+          "finding": "Tool metadata updates require tool_use_id/callID. If missing, ctx.metadata cannot update ToolPart; metadata is stored in ToolMetadataRegistry but there is no retrieval usage shown in codebase.",
+          "evidence": "updateToolMetadata bails when callID missing; ToolMetadataRegistry.store is called post-execution but no retrieve references found." 
+        },
+        {
+          "file": "packages/opencode/src/cli/cmd/tui/context/local.tsx",
+          "finding": "Agent name/color in Task UI comes from input.subagent_type and local.agent.color (based on sync agent list; subagents are excluded from selectable list but still colored).",
+          "evidence": "Task component uses Locale.titlecase(props.input.subagent_type) and local.agent.color(name)." 
+        }
+      ],
+      "prior_art": [
+        {
+          "ref": ".agents/sdlc/done/align-sdk-tool-names.md",
+          "note": "Prior work mentions mcp_opencode_task naming; relevant to tool name normalization path." 
+        }
+      ],
+      "patterns": [
+        "SolidJS + OpenTUI components; Session route owns rendering and toggles visibility (showDetails/showThinking).",
+        "UI renders only current session parts; child/subagent tool calls are surfaced only via Task tool metadata summary.",
+        "Task tool progress depends on ctx.metadata updates which require tool_use_id/callID." 
+      ],
+      "raw_options": [
+        "Trace and fix MCP tool_use_id propagation so ctx.metadata updates reach Task ToolPart during execution.",
+        "Merge ToolMetadataRegistry into tool_use_summary processing so metadata.summary shows up for MCP tools.",
+        "TUI fetches child session parts using metadata.sessionId and renders a live toolcall list inline.",
+        "Extend Task component to show the full summary list (not just last) plus counts/status badges.",
+        "Add server-side event that mirrors child session tool updates into parent session metadata." 
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T17:30:00Z",
+    "work_item": "subagent-tui-updates.md",
+    "parent_packet": null
+  }
+}

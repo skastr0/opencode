@@ -1,0 +1,52 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Bad Request (400) responses for claude-opus-4-5 via opencode provider; need to identify failing parameter and align thinking/effort mapping while preserving variant behavior.",
+      "constraints": [
+        "Explore phase only (no implementation).",
+        "Avoid logging secrets; sanitize headers and message content.",
+        "Keep upstream variant behavior intact while mapping agent.thinking." 
+      ],
+      "options": [
+        {
+          "name": "Instrument request + error logging for Anthropic/opencode",
+          "approach": "Add safe logs in LLM.stream after params/options are built (capture modelID, providerID, variant, thinking/effort fields, maxOutputTokens) and extend onError to capture provider error payload/status (redacting headers and message content). Run a failing request to capture exact payload.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Exact outgoing params and error body, confirming which field triggers 400.",
+          "risk_if_wrong": "Low; adds temporary logging but does not change behavior.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Config-only isolation run",
+          "approach": "Run local requests with agent.thinking disabled and with/without --variant to see if 400 persists; then test thinking only vs variant only. Capture error text from session.error events.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Whether thinking budgets or effort mapping are the trigger without code changes.",
+          "risk_if_wrong": "Low; relies on local config toggles.",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Spec alignment audit against Vercel AI SDK",
+          "approach": "Compare current Anthropic effort/thinking shapes to Vercel AI Gateway docs (effort in providerOptions, thinking in thinking {type, budget_tokens}); verify if Opus 4.5 expects output_config or effort-only beta header, and cross-check AI SDK issues on thinking/tool_choice restrictions.",
+          "time_to_learning": "2-4 hours",
+          "what_we_learn": "Whether the request shape mismatches upstream expectations and which parameter is out of spec.",
+          "risk_if_wrong": "Medium; could still require empirical logs to confirm.",
+          "reversibility": "high",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it yields the fastest concrete evidence about the exact failing parameter with minimal risk."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T22:52:14Z",
+    "work_item": "debug-opus-bad-requests.md",
+    "parent_packet": "2026-01-20T22-52-14-explore-research.json"
+  }
+}

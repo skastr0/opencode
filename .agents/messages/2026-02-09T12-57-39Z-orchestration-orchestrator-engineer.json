@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Chose fastest learning path from exploration output",
+    "data": {
+      "work_item": "investigate-provider-timeout-sleep-wake.md",
+      "decision": "Select Option 1 (config A/B isolation) followed by Option 2 (minimal boundary diagnostics)",
+      "rationale": "This sequence maximizes learning per hour while minimizing blast radius and can confirm whether timeout propagation or error-shape handling is the primary issue",
+      "from_phase": "exploring",
+      "to_phase": "committed",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T12:57:39Z",
+    "work_item": "investigate-provider-timeout-sleep-wake.md",
+    "parent_packet": "2026-02-09T12-56-13Z-explore-options.json",
+    "blocking": false
+  }
+}

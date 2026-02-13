@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Dispatching review phase for complete changes UI batch",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Run review-coordinator across WI-01 through WI-06 as a single integrated review",
+      "rationale": "The final slice (WI-06) integrates prior work, so holistic review is more accurate than isolated per-item review.",
+      "from_phase": "reviewing",
+      "to_phase": "reviewing",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T04:03:06Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T04-02-28Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

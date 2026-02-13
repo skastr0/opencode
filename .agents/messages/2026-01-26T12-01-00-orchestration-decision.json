@@ -1,0 +1,39 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "builder",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Dispatching builder to cleanup obsolete AI SDK wrapper",
+    "data": {
+      "work_item": "cleanup-ai-sdk-wrapper.md",
+      "decision": "Fast path - skip explore/commit, proceed directly to build",
+      "rationale": "Task is well-understood cleanup. Type analysis reveals clear dependency graph. Move needed code to native/, delete obsolete wrapper.",
+      "from_phase": "backlog",
+      "to_phase": "building",
+      "confidence": "high",
+      "dependency_analysis": {
+        "files_to_move": [
+          "sdk/claude-agent-sdk/tool-bridge.ts → native/tool-bridge.ts",
+          "sdk/claude-agent-sdk/session-store.ts → native/session-store.ts",
+          "sdk/claude-agent-sdk/models.ts (CLAUDE_AGENT_SDK_MODELS, mapModelId) → native/models.ts"
+        ],
+        "files_to_delete": [
+          "sdk/claude-agent-sdk/ (entire folder)",
+          "test/provider/sdk/claude-agent-sdk/translate.test.ts"
+        ],
+        "imports_to_update": [
+          "native/claude-agent-sdk.ts",
+          "session/llm.ts",
+          "provider/provider.ts"
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T12:01:00Z",
+    "work_item": "cleanup-ai-sdk-wrapper.md",
+    "parent_packet": null,
+    "blocking": false
+  }
+}

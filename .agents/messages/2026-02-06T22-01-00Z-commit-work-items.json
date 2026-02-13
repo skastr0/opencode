@@ -1,0 +1,86 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "work-items",
+  "content": {
+    "summary": "Work items generated from commit plan for collapsible/filter sidebar",
+    "data": {
+      "work_items": [
+        {
+          "filename": "01-collapsible-directory-nodes.md",
+          "title": "Add collapsible directory nodes to FileList with stable selection",
+          "acceptance_criteria": [
+            "Directory header rows render ▶/▼ toggle indicators and are clickable to collapse/expand",
+            "Space key on a directory-header row toggles collapse",
+            "Collapsing a directory hides its child file rows from visibleRows",
+            "Selection remaps to nearest visible file when current selection is hidden by collapse",
+            "Collapse state survives list navigation and refetch; pruned when paths disappear",
+            "Stage grouping (staged/unstaged/untracked) is preserved — collapse is per-directory within each stage",
+            "onSelect payload shape (FileSelection) is unchanged",
+            "bun run typecheck passes"
+          ],
+          "dependencies": [],
+          "estimated_effort": "1.5 hours",
+          "order": 1
+        },
+        {
+          "filename": "02-fuzzy-filter-input.md",
+          "title": "Add fuzzy filename filter with keyboard isolation",
+          "acceptance_criteria": [
+            "'/' hotkey activates an inline filter <input> at the top of the file list",
+            "Typing in the filter input scores files by path using fuzzysort and hides non-matching files",
+            "Parent directory headers remain visible when any descendant matches",
+            "When filter is active, collapse state is ignored (all matching files visible regardless of collapse)",
+            "Escape in filter mode clears filter text and exits editing mode",
+            "While filter input is focused, j/k/r/up/down hotkeys are suppressed in file-list keyboard handler",
+            "Route-level hotkeys (S submit, Esc close) still work when filter is not focused",
+            "When filter is cleared, previous selection is restored if still in the file list",
+            "bun run typecheck passes"
+          ],
+          "dependencies": ["01-collapsible-directory-nodes.md"],
+          "estimated_effort": "1.5 hours",
+          "order": 2
+        },
+        {
+          "filename": "03-footer-hints-update.md",
+          "title": "Update ChangesFooter with collapse and filter hotkey hints",
+          "acceptance_criteria": [
+            "Footer shows '/ filter' hint",
+            "Footer shows 'space toggle' hint when a directory row is highlighted",
+            "Existing hints (esc close, ↑↓ navigate, c comment, S submit) are preserved",
+            "bun run typecheck passes"
+          ],
+          "dependencies": ["01-collapsible-directory-nodes.md"],
+          "estimated_effort": "0.5 hours",
+          "order": 3
+        },
+        {
+          "filename": "04-runtime-verification-checklist.md",
+          "title": "Manual runtime verification: keyboard, comment reset, duplicate submit",
+          "acceptance_criteria": [
+            "Verified: up/down/j/k navigate through files, skipping collapsed directories",
+            "Verified: enter selects a file and DiffPane loads its diff",
+            "Verified: '/' opens filter, typing filters files, Escape clears and restores navigation",
+            "Verified: j/k/r keys do NOT trigger while filter input is focused",
+            "Verified: c (comment) works when filter is NOT focused",
+            "Verified: S (submit) works from any state, and setComments(() => []) clears all comments before navigation",
+            "Verified: after submit + navigation back to /changes, no prior comments are present",
+            "Verified: pressing S twice rapidly does not duplicate-submit (comments.length === 0 guard fires)",
+            "Verified: collapse + filter combined does not break selection or produce empty visible rows"
+          ],
+          "dependencies": ["01-collapsible-directory-nodes.md", "02-fuzzy-filter-input.md", "03-footer-hints-update.md"],
+          "estimated_effort": "0.5 hours",
+          "order": 4
+        }
+      ],
+      "total_items": 4,
+      "total_estimated_effort": "4 hours"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T22:01:00Z",
+    "work_item": "changes-sidebar-collapsible-filter.md",
+    "parent_packet": "2026-02-06T22-00-00Z-commit-plan.json"
+  }
+}

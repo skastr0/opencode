@@ -1,0 +1,68 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented Scaffold the /changes route and command registration",
+    "data": {
+      "work_item": "02-changes-route-scaffold.md",
+      "files_changed": [
+        "packages/opencode/src/cli/cmd/tui/context/route.tsx",
+        "packages/opencode/src/cli/cmd/tui/app.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx",
+        ".agents/sdlc/reviewing/02-changes-route-scaffold.md"
+      ],
+      "files_added": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx"
+      ],
+      "tests_added": [],
+      "validation_results": {
+        "tests": "not run (not required by acceptance criteria)",
+        "types": "pass",
+        "lint": "not run (not required by acceptance criteria)"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "Route union includes ChangesRoute with type changes",
+          "status": "met"
+        },
+        {
+          "criterion": "App renders Changes route branch",
+          "status": "met"
+        },
+        {
+          "criterion": "/changes slash command registered",
+          "status": "met"
+        },
+        {
+          "criterion": "Command palette includes View changes action",
+          "status": "met"
+        },
+        {
+          "criterion": "Changes command navigates with returnTo current route",
+          "status": "met"
+        },
+        {
+          "criterion": "Changes component exists at routes/changes/index.tsx",
+          "status": "met"
+        },
+        {
+          "criterion": "Changes component shows header and Escape returns to previous route",
+          "status": "met"
+        },
+        {
+          "criterion": "bun run typecheck passes",
+          "status": "met"
+        }
+      ],
+      "notes": "Kept scope to routing + command scaffold only. Added returnTo wiring and minimal placeholder screen without file/diff/comment logic.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:36:31Z",
+    "work_item": "02-changes-route-scaffold.md",
+    "parent_packet": null
+  }
+}

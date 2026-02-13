@@ -1,0 +1,61 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented tool event flow and error handling for Claude V2 native stream",
+    "data": {
+      "work_item": "claude-v2-tool-execution.md",
+      "files_changed": [
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts",
+        "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+        "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts",
+        "packages/opencode/test/provider/native/claude-agent-sdk.test.ts"
+      ],
+      "files_added": [],
+      "tests_added": [
+        "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts",
+        "packages/opencode/test/provider/native/claude-agent-sdk.test.ts"
+      ],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "not_run"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "Detect `tool_use` blocks in assistant messages from V2 stream",
+          "status": "met"
+        },
+        {
+          "criterion": "Execute tools via OpenCode's ToolRegistry (not SDK's MCP)",
+          "status": "met"
+        },
+        {
+          "criterion": "Send tool results back to session via `session.send()` with proper format",
+          "status": "met"
+        },
+        {
+          "criterion": "Emit `tool-call` and `tool-result` events for UI display",
+          "status": "met"
+        },
+        {
+          "criterion": "Handle tool execution errors gracefully",
+          "status": "met"
+        },
+        {
+          "criterion": "Support multi-tool responses (multiple tool_use blocks)",
+          "status": "met"
+        }
+      ],
+      "notes": "Translate stream now emits tool-error for failed summaries and tests cover multi-tool + native event flow.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T01:05:13Z",
+    "work_item": "claude-v2-tool-execution.md",
+    "parent_packet": null
+  }
+}

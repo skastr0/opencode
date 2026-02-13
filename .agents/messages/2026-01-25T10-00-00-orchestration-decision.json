@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Fast path: Skip exploration for SDK tool name alignment",
+    "data": {
+      "work_item": "align-sdk-tool-names.md",
+      "decision": "Skip exploration phase - task is well-understood",
+      "rationale": "Clear solution: normalize PascalCase SDK tool names to lowercase in translate-stream.ts. Small surface area, no architectural decisions, low risk.",
+      "from_phase": "exploring",
+      "to_phase": "committed",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T10:00:00Z",
+    "work_item": "align-sdk-tool-names.md",
+    "parent_packet": null,
+    "blocking": false
+  }
+}

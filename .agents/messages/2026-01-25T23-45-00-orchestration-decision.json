@@ -1,0 +1,35 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Completed parallel exploration of direct Agents SDK integration - 4 explorers dispatched",
+    "data": {
+      "work_item": "direct-agents-sdk-integration.md",
+      "explorations_completed": [
+        "Vercel AI SDK integration mapping",
+        "Claude Agent SDK native API",
+        "Tool mapping/bridge layer analysis",
+        "Session management across stack"
+      ],
+      "key_findings": {
+        "vercel_coupling": "High coupling - streamText, wrapLanguageModel, ModelMessage, tool schemas used across session, prompt, MCP, and agent flows",
+        "tool_issues": "Provider-executed tools processed by Vercel AI SDK, fails validation and remaps to _providerExecuted losing original tool name",
+        "session_issues": "providerOptions['claude-agent-sdk'].sessionId defaults to 'default' causing session collisions, tool-bridge context fallback",
+        "sdk_native_api": "query() is primary entry point, yields messages directly, has native session management via resume parameter"
+      },
+      "options_emerging": [
+        "Feature-flagged Claude direct path (4-8hrs, low risk)",
+        "Introduce internal model interface (1-2 days, medium risk)",
+        "Full replacement of streamText pipeline (3-7 days, high risk)"
+      ],
+      "from_phase": "exploring",
+      "current_status": "synthesizing findings"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:45:00Z",
+    "work_item": "direct-agents-sdk-integration.md"
+  }
+}

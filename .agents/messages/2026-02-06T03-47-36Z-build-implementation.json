@@ -1,0 +1,64 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented changes footer with reactive summary and keybind hints",
+    "data": {
+      "work_item": "05-changes-footer.md",
+      "files_changed": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/footer.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx",
+        "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx",
+        ".agents/sdlc/reviewing/05-changes-footer.md"
+      ],
+      "files_added": [
+        "packages/opencode/src/cli/cmd/tui/routes/changes/footer.tsx"
+      ],
+      "tests_added": [],
+      "validation_results": {
+        "tests": "not_run",
+        "types": "pass",
+        "lint": "not_run"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "ChangesFooter component created at packages/opencode/src/cli/cmd/tui/routes/changes/footer.tsx",
+          "status": "met"
+        },
+        {
+          "criterion": "Shows summary: N files changed with total additions/deletions",
+          "status": "met"
+        },
+        {
+          "criterion": "Shows keybind hints: esc close, ↑↓ navigate, enter select, c comment (if commenting is implemented), S submit",
+          "status": "met"
+        },
+        {
+          "criterion": "Integrated into the Changes route layout at the bottom",
+          "status": "met"
+        },
+        {
+          "criterion": "Updates reactively as file list data changes",
+          "status": "met"
+        },
+        {
+          "criterion": "Shows buffered comment count and submit enabled/disabled state",
+          "status": "met"
+        },
+        {
+          "criterion": "bun run typecheck passes",
+          "status": "met"
+        }
+      ],
+      "notes": "FileList now emits reactive totals via onSummary. Changes route stores these totals and passes them into the new footer. Footer receives comments/submit props as hook points and currently displays a zero-buffer placeholder with disabled submit.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:47:36Z",
+    "work_item": "05-changes-footer.md",
+    "parent_packet": "2026-02-06T12-00-00-commit-plan.json"
+  }
+}

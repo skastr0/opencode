@@ -1,0 +1,138 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: map Vercel AI SDK integration in packages/opencode/src",
+    "data": {
+      "original_input": "Exploration: Vercel AI SDK Integration in OpenCode. Map current usage, provider abstraction, Claude Agent SDK wrapper, streaming flow, and other providers using Vercel AI SDK.",
+      "codebase_findings": [
+        {
+          "path": "packages/opencode/src/provider/provider.ts",
+          "details": [
+            "Imports Vercel AI SDK Provider type from \"ai\" and bundles many @ai-sdk/* providers.",
+            "BUNDLED_PROVIDERS maps provider npm to create* functions (anthropic, openai, google, etc.).",
+            "getSDK builds provider options and instantiates SDK providers; getLanguage returns LanguageModelV2 instances used by streamText.",
+            "claude-agent-sdk is registered as a custom provider (sdk.languageModel)."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/session/llm.ts",
+          "details": [
+            "Main streaming entrypoint uses streamText/wrapLanguageModel from \"ai\".",
+            "Calls Provider.getLanguage to get LanguageModelV2 for selected provider/model.",
+            "wrapLanguageModel middleware applies ProviderTransform.message and extractReasoningMiddleware.",
+            "Tooling uses ai Tool/ToolSet types; providerExecuted tool stub added for Claude Agent SDK tool execution."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/provider/transform.ts",
+          "details": [
+            "Normalizes ModelMessage content, applies caching providerOptions, and remaps providerOptions key via sdkKey().",
+            "sdkKey maps @ai-sdk/* packages to AI SDK providerOptions keys (openai, anthropic, google, bedrock, gateway, openrouter).",
+            "providerOptions() wraps options under provider key expected by AI SDK."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/claude-agent-sdk-model.ts",
+          "details": [
+            "Implements LanguageModelV2 from @ai-sdk/provider to adapt Claude Agent SDK.",
+            "doStream loads @anthropic-ai/claude-agent-sdk query(), translates prompt, builds MCP tool server, and returns AI SDK stream parts.",
+            "doGenerate reconstructs content/usage from stream parts to satisfy AI SDK expectations."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts",
+          "details": [
+            "Converts Claude Agent SDK async stream events into LanguageModelV2StreamPart.",
+            "Handles tool progress/summary events and emits tool-call/tool-result with providerExecuted metadata."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-prompt.ts",
+          "details": [
+            "Translates LanguageModelV2Prompt to Claude Agent SDK prompt format, including tool results and file parts."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/claude-agent-sdk/tool-bridge.ts",
+          "details": [
+            "Uses Claude Agent SDK createSdkMcpServer to expose OpenCode tools/MCP tools to the SDK.",
+            "Converts Zod schemas to SDK-compatible input schemas; tool execution routed through OpenCode ToolRegistry."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/openai-compatible/src/openai-compatible-provider.ts",
+          "details": [
+            "Custom provider implements LanguageModelV2 using @ai-sdk/provider; used for GitHub Copilot and openai-compatible endpoints.",
+            "Relies on @ai-sdk/openai-compatible and @ai-sdk/provider-utils."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/provider/sdk/openai-compatible/src/responses/openai-responses-language-model.ts",
+          "details": [
+            "Implements LanguageModelV2.doStream using AI SDK provider-utils and SSE parser to emit LanguageModelV2StreamPart."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/session/message-v2.ts",
+          "details": [
+            "Uses AI SDK error/types (APICallError, LoadAPIKeyError) and convertToModelMessages for message conversion."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/session/prompt.ts",
+          "details": [
+            "Uses ai tool/jsonSchema/ToolCallOptions for tool definitions passed to AI SDK calls."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/mcp/index.ts",
+          "details": [
+            "Maps MCP tools to AI SDK Tool via dynamicTool/jsonSchema."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/agent/agent.ts",
+          "details": [
+            "Uses generateObject/streamObject from AI SDK for agent generation flows."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/session/index.ts",
+          "details": [
+            "Uses LanguageModelUsage and ProviderMetadata types from AI SDK for session metadata."
+          ]
+        },
+        {
+          "path": "packages/opencode/src/acp/agent.ts",
+          "details": [
+            "Uses LoadAPIKeyError from AI SDK when surfacing auth issues."
+          ]
+        }
+      ],
+      "prior_art": [
+        "No .agents/messages learn packets or .agents/sdlc/done work items found in this repo."
+      ],
+      "patterns": [
+        "LanguageModelV2 is the core provider abstraction across OpenCode; providers return LanguageModelV2 instances consumed by streamText.",
+        "Provider options are keyed by provider name per AI SDK expectations (ProviderTransform.sdkKey/providerOptions).",
+        "Tooling and message flow are modeled using AI SDK types (ModelMessage, Tool, ToolSet, StreamTextResult).",
+        "Claude Agent SDK is already wrapped to conform to AI SDK streaming and tool-call semantics via translate-* adapters."
+      ],
+      "raw_options": [
+        "Add a feature-flagged LLM stream path that calls Claude Agent SDK directly and bypasses streamText (keep AI SDK elsewhere).",
+        "Introduce an internal model interface (OpenCodeLanguageModel) and adapt AI SDK and Claude Agent SDK behind it.",
+        "Replace streamText/wrapLanguageModel with direct SDK streaming and implement equivalent middleware (reasoning, tool repair).",
+        "Keep AI SDK and only tighten the Claude Agent SDK adapter to reduce dependency surface (status quo with improved isolation).",
+        "Spike a minimal shim that emulates streamText using LanguageModelV2.doStream to measure how much logic lives in AI SDK middleware."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:39:19Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

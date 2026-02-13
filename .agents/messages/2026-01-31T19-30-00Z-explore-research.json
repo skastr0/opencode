@@ -1,0 +1,115 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: OpenCode plugin system (loading, auth, MCP, config)",
+    "data": {
+      "original_input": "Explore the opencode-fork codebase to understand the plugin system: architecture/loading, MCP server support as plugins, configuration/secrets handling, auth patterns, cross-plugin auth integration, plugin manifest format, tool/command registration, config/secrets access, and examples of external API auth usage.",
+      "codebase_findings": [
+        {
+          "topic": "Plugin SDK surface and hooks",
+          "details": "@opencode-ai/plugin defines Plugin as an async function returning Hooks. Hooks include tool registry, auth hook (oauth/api prompts + loader), event, chat.params, chat.headers, permission.ask, command/tool execute hooks, and experimental transforms. PluginInput provides SDK client, project/worktree/directories, server URL, and Bun shell helper.",
+          "files": [
+            "packages/plugin/src/index.ts",
+            "packages/plugin/src/tool.ts",
+            "packages/plugin/src/example.ts"
+          ]
+        },
+        {
+          "topic": "Plugin loading and lifecycle",
+          "details": "Core loader builds a PluginInput, loads internal plugins (CodexAuthPlugin/CopilotAuthPlugin), then loads configured plugins. npm specifiers are installed via BunProc; file:// plugins are imported directly. Exports are iterated and deduped by function reference before init. Builtins opencode-anthropic-auth and @gitlab/opencode-gitlab-auth are added unless disabled. Plugin.trigger broadcasts hook calls across loaded plugins; Plugin.list returns hooks for other subsystems.",
+          "files": [
+            "packages/opencode/src/plugin/index.ts",
+            "packages/opencode/src/plugin/codex.ts",
+            "packages/opencode/src/plugin/copilot.ts"
+          ]
+        },
+        {
+          "topic": "Config discovery and plugin sources",
+          "details": "Config merges remote well-known config, global, project, and .opencode directories. Plugins can come from config.plugin (string array of npm specifiers or file URLs) and from local plugin(s) directories (plugin/ or plugins/ with .ts/.js). Plugin names are deduped by canonical name with local > global priority. .opencode directories get package.json and bun install, including @opencode-ai/plugin.",
+          "files": [
+            "packages/opencode/src/config/config.ts"
+          ]
+        },
+        {
+          "topic": "Tool registration and plugin tools",
+          "details": "ToolRegistry loads custom tools from tool(s) directories and all plugin.tool definitions. Plugin tools are wrapped into Tool.Info with Zod schema and executed using Plugin ToolContext (directory/worktree, metadata, permission ask).",
+          "files": [
+            "packages/opencode/src/tool/registry.ts",
+            "packages/plugin/src/tool.ts"
+          ]
+        },
+        {
+          "topic": "Auth integration and provider overrides",
+          "details": "Provider loading merges env keys, Auth store entries, and config. Plugin auth hooks provide per-provider loader outputs (custom fetch/baseURL/apiKey) when auth exists. Special handling exists for GitHub Copilot enterprise. Auth storage uses Global.Path.data/auth.json with 0o600 perms.",
+          "files": [
+            "packages/opencode/src/provider/provider.ts",
+            "packages/opencode/src/auth/index.ts"
+          ]
+        },
+        {
+          "topic": "Auth plugin examples (external API usage)",
+          "details": "CodexAuthPlugin uses OAuth with PKCE/device flow, refreshes tokens, rewrites requests to ChatGPT Codex endpoint, and injects Bearer + ChatGPT-Account-Id headers. CopilotAuthPlugin uses GitHub device flow, sets Authorization + Copilot headers, and supports enterprise base URL. Both expose auth.methods for CLI prompts and use custom fetch in provider options.",
+          "files": [
+            "packages/opencode/src/plugin/codex.ts",
+            "packages/opencode/src/plugin/copilot.ts"
+          ]
+        },
+        {
+          "topic": "Plugin hook invocation points",
+          "details": "chat.params/chat.headers and experimental system transforms are invoked during LLM request construction; permission.ask is invoked before prompting user; tool.execute.before/after wraps tool execution (including MCP tools).",
+          "files": [
+            "packages/opencode/src/session/llm.ts",
+            "packages/opencode/src/permission/index.ts",
+            "packages/opencode/src/provider/native/tool-bridge.ts"
+          ]
+        },
+        {
+          "topic": "MCP server support",
+          "details": "MCP servers are configured via config.mcp (local or remote). Remote connections use StreamableHTTP/SSE transports, local uses stdio command. OAuth is enabled by default for remote servers unless oauth:false; OAuth state/tokens/client info are stored in Global.Path.data/mcp-auth.json (0o600). MCP routes expose status/add/auth/connect endpoints. MCP tools are surfaced as tool names prefixed mcp_<id> and registered into the SDK tool bridge; Claude Agent SDK wiring uses mcpServers with allowedTools mcp__opencode__*.",
+          "files": [
+            "packages/opencode/src/config/config.ts",
+            "packages/opencode/src/mcp/index.ts",
+            "packages/opencode/src/mcp/oauth-provider.ts",
+            "packages/opencode/src/mcp/auth.ts",
+            "packages/opencode/src/server/routes/mcp.ts",
+            "packages/opencode/src/provider/native/tool-bridge.ts",
+            "packages/opencode/src/provider/native/claude-agent-sdk.ts"
+          ]
+        },
+        {
+          "topic": "Plugin manifest format",
+          "details": "No dedicated plugin manifest file was found. Plugins appear to be plain JS/TS modules exporting Plugin functions (named or default). They are referenced by npm specifier or by file:// URLs discovered from plugin/ or plugins/ directories.",
+          "files": [
+            "packages/opencode/src/config/config.ts",
+            "packages/opencode/src/plugin/index.ts",
+            "packages/plugin/src/index.ts"
+          ]
+        }
+      ],
+      "prior_art": [
+        "No learn-retrospective packets found in .agents/messages"
+      ],
+      "patterns": [
+        "Plugins are async modules returning Hooks; hooks are invoked via Plugin.trigger at specific lifecycle points.",
+        "Auth is centralized in Auth/McpAuth JSON files with 0o600 perms; plugins provide provider-specific fetch overrides via auth.loader.",
+        "Config merges multiple sources and auto-discovers plugins/tools from .opencode directories; plugin array is deduped by canonical name.",
+        "MCP is treated as a first-class integration (not a plugin) but its tools are exposed as tool definitions similar to plugin tools."
+      ],
+      "raw_options": [
+        "Inspect external built-in plugins (opencode-anthropic-auth, opencode-gitlab-auth) to confirm expected exports and auth patterns.",
+        "Create a minimal local plugin in a .opencode/plugins folder and run opencode to validate load order, hook firing, and tool registration behavior.",
+        "Trace MCP OAuth auth flow end-to-end via CLI (mcp auth/start/callback) and confirm mcp-auth.json structure and renewal behavior.",
+        "Map plugin hook invocations across session/prompt/processor to understand where each hook affects outputs.",
+        "Document config precedence and plugin dedup priority with a small synthetic config set (global vs local vs managed)."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-31T19:30:00Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

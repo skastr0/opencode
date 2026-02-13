@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "review-coordinator",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "WI-01 build completed and advanced to review",
+    "data": {
+      "work_item": "wi-01-timeout-path-test.md",
+      "decision": "Run review to validate test quality and scope conformance",
+      "rationale": "Builder reports all WI-01 acceptance criteria met with passing tests and typecheck; review should confirm no hidden issues before marking done",
+      "from_phase": "building",
+      "to_phase": "reviewing",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-09T13:09:14Z",
+    "work_item": "wi-01-timeout-path-test.md",
+    "parent_packet": "2026-02-09T13-02-20Z-orchestration-orchestrator-engineer.json",
+    "blocking": false
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented Claude Agent SDK V2 native streaming core",
+    "data": {
+      "work_item": "claude-v2-native-stream.md",
+      "files_changed": [".agents/sdlc/reviewing/claude-v2-native-stream.md"],
+      "files_added": [
+        "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+        "packages/opencode/test/provider/native/claude-agent-sdk.test.ts"
+      ],
+      "tests_added": ["packages/opencode/test/provider/native/claude-agent-sdk.test.ts"],
+      "validation_results": {
+        "tests": "pass (bun test test/provider/native/claude-agent-sdk.test.ts)",
+        "types": "pass (bun run typecheck)",
+        "lint": "not_run"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "AC-1: Create streamClaudeNative() using V2 create/resume",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-2: Session creation when no prior session exists",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-3: Session resumption when SDK session ID exists",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-4: Emit SessionProcessor-compatible stream events",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-5: Close session on completion or abort",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-6: Graceful error emission",
+          "status": "met"
+        }
+      ],
+      "notes": "Streams V2 session messages through translate-stream, maps deltas to text/reasoning events, and captures session_id from every SDK message.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T00-18-44Z",
+    "work_item": "claude-v2-native-stream.md",
+    "parent_packet": null
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: debug-opus-bad-requests",
+    "data": {
+      "original_input": "Explore debug-opus-bad-requests for Anthropic/opencode request construction, thinking/effort mapping, variant handling, and 400 error context.",
+      "codebase_findings": [
+        {
+          "area": "LLM request construction",
+          "file": "packages/opencode/src/session/llm.ts",
+          "notes": [
+            "Builds variant options from model.variants + input.user.variant (disabled when small).",
+            "Agent thinking config is mapped to ThinkingEffort defaults and converted via buildThinkingOptions().",
+            "For @ai-sdk/anthropic, buildThinkingOptions returns thinking {type: enabled, budgetTokens} plus effort at top-level.",
+            "Options are merged in order: ProviderTransform.options → smallOptions → thinkingOptions → model.options → agent.options → variant.",
+            "ProviderTransform.providerOptions wraps options by SDK key (anthropic, bedrock, etc) before streamText.",
+            "Errors are logged in streamText onError without request payload context."
+          ]
+        },
+        {
+          "area": "Provider message normalization + caching",
+          "file": "packages/opencode/src/provider/transform.ts",
+          "notes": [
+            "normalizeMessages strips empty content for Anthropic and normalizes toolCallIds for Claude.",
+            "applyCaching adds providerOptions cacheControl for Anthropic/OpenRouter/Bedrock.",
+            "message() remaps providerOptions keys to SDK key (anthropic) when providerID differs.",
+            "variants() defines reasoning presets; for @ai-sdk/anthropic only high/max map to thinking budgets (no effort).",
+            "maxOutputTokens() inflates max_tokens when thinking is enabled (budgetTokens + output limit)."
+          ]
+        },
+        {
+          "area": "Provider headers",
+          "file": "packages/opencode/src/provider/provider.ts",
+          "notes": [
+            "Anthropic custom loader injects anthropic-beta headers including effort-2025-11-24.",
+            "This header is present for all Anthropic SDK requests, not gated to specific models."
+          ]
+        },
+        {
+          "area": "Agent thinking config",
+          "file": "packages/opencode/src/config/config.ts",
+          "notes": [
+            "Config.Thinking supports effort (low|medium|high) and budgetTokens.",
+            "Agent definitions can include thinking, which feeds LLM.stream mapping."
+          ]
+        },
+        {
+          "area": "Variant entry points",
+          "file": "packages/opencode/src/cli/cmd/run.ts",
+          "notes": [
+            "CLI supports --variant to pick provider-specific reasoning effort presets (e.g., high, max, minimal)."
+          ]
+        },
+        {
+          "area": "Thinking budget defaults",
+          "file": "packages/opencode/src/session/thinking-effort.ts",
+          "notes": [
+            "Default budgets: low=4k, medium=10k, high=16k; clamped per provider in buildThinkingOptions()."
+          ]
+        }
+      ],
+      "prior_art": [
+        "No learn-retrospective packets found in .agents/messages (glob returned none).",
+        "Repo search for claude-opus-4-5 found only fixtures and console example; no stored 400 error logs or payloads."
+      ],
+      "patterns": [
+        "Variants are provider-specific reasoning presets derived from ProviderTransform.variants and merged after agent/model options.",
+        "Agent thinking config is separate from variants and is mapped to provider-specific options in LLM.buildThinkingOptions.",
+        "ProviderOptions are namespaced by SDK key via ProviderTransform.providerOptions and remapped in ProviderTransform.message."
+      ],
+      "raw_options": [
+        "Add sanitized logging around LLM.stream options/providerOptions and error payloads for anthropic/opencode calls.",
+        "Run config-only toggles (disable agent thinking, remove variant) to isolate whether effort/thinking triggers 400.",
+        "Compare current effort/thinking shape to Vercel AI Gateway docs and Anthropic effort beta requirements.",
+        "Check tool_choice + thinking compatibility when tools are forced (known AI SDK limitation).",
+        "Confirm whether effort should be passed under output_config or providerOptions for Opus 4.5."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T22:52:14Z",
+    "work_item": "debug-opus-bad-requests.md",
+    "parent_packet": null
+  }
+}

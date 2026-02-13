@@ -1,0 +1,34 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "update-report",
+    "data": {
+      "what_done": "Reviewed Task tool and command/subtask flows to trace how subagent model selection and agent routing behave.",
+      "approach_taken": "Searched the repo for Task tool implementation, agent config handling, and command/subtask creation paths; cross-referenced model selection logic and defaults.",
+      "challenges_faced": "Isolating why a primary agent can appear in Task calls required tracing both direct Task tool usage and the command-generated subtask path.",
+      "how_solved": "Mapped Task tool execution and the command subtask condition, then identified fallback and missing mode enforcement in the Task tool.",
+      "evidence": {
+        "files": [
+          "packages/opencode/src/tool/task.ts",
+          "packages/opencode/src/session/prompt.ts",
+          "packages/opencode/src/command/index.ts",
+          "packages/opencode/src/agent/agent.ts"
+        ],
+        "tests": [],
+        "metrics": {}
+      },
+      "reasoning": "Task tool falls back to the parent message model when the subagent lacks a model and does not enforce subagent-only usage; commands with subtask=true can therefore trigger Task calls using the current primary agent/model.",
+      "next_steps": [
+        "Decide whether to enforce subagent-only validation in TaskTool (reject primary agents).",
+        "Audit commands with subtask:true and set command.agent to a dedicated subagent or flip subtask:false."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T16:54:37Z",
+    "priority": "low",
+    "blocking": false
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "from": "commitment-analyst",
+  "to": "caller",
+  "phase": "commit",
+  "type": "plan",
+  "content": {
+    "summary": "Implementation plan for: Harden tool_use_summary handling in native stream",
+    "data": {
+      "goal": "Ensure claude-agent-sdk native streaming emits tool-result/tool-error promptly so tool parts do not remain in running state until stream end.",
+      "learning_milestone": "When a tool_use_summary event arrives (with or without summary, with or without error), the tool part transitions to completed or error immediately and is not aborted at stream end.",
+      "approach": "Update processSDKMessage in the native claude-agent-sdk stream to treat any tool_use_summary as a completion signal. If summary is missing, emit tool-result with a default output text instead of skipping the event. If the summary indicates failure (is_error or error payload), emit tool-error and close out the tool call. This mirrors the more robust behavior already used in translate-stream while keeping the change surface minimal.\n\nUse the existing tool id resolution (tool_use_id, preceding_tool_use_ids, or last pending tool) and delete entries from state.toolCalls once emitted so SessionProcessor does not mark them as aborted. If metadata fidelity is needed later, consider reusing ToolMetadataRegistry, but it is not required to fix the running-state issue.",
+      "changes_required": [
+        {
+          "file": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+          "change": "Emit tool-result on tool_use_summary even without summary (default output text) and emit tool-error on is_error/error fields; always close out state.toolCalls entries."
+        }
+      ],
+      "challenges": {
+        "technical": [
+          "SDK tool_use_summary payloads vary (missing summary, different error shapes), which requires tolerant parsing to avoid skipping completion events.",
+          "Tool ids may be absent in events, so fallback resolution must avoid completing the wrong tool when multiple are pending."
+        ],
+        "resourcing": {
+          "estimated_effort": "2-4 hours",
+          "dependencies": [
+            "Access to claude-agent-sdk stream event samples or debug logs",
+            "Reference behavior from translate-stream"
+          ],
+          "skills_required": [
+            "TypeScript",
+            "Streaming event handling",
+            "Anthropic claude-agent-sdk event schema"
+          ],
+          "risk_factors": [
+            "tool_use_summary may not be emitted for some tool executions",
+            "Error fields may be nested or non-string"
+          ]
+        },
+        "open_questions": [
+          "Do all claude-agent-sdk tool executions emit tool_use_summary, or are some only tool_progress?",
+          "What is the canonical error shape for tool_use_summary (is_error boolean vs error object)?"
+        ]
+      },
+      "testing_strategy": {
+        "unit": [
+          "Add a small test or harness for processSDKMessage to verify tool-result is emitted when summary is missing and tool-error is emitted when error fields are present."
+        ],
+        "integration": [
+          "Run a claude-agent-sdk session with a tool call and confirm the tool part transitions to completed/error before stream end."
+        ]
+      },
+      "risks": [
+        {
+          "risk": "Fallback tool id selection could complete the wrong tool when multiple tool calls are pending.",
+          "mitigation": "Prefer tool_use_id/preceding_tool_use_ids and only fall back to last pending id when no identifiers are present."
+        },
+        {
+          "risk": "Default output text may be misleading when a tool actually failed without explicit error data.",
+          "mitigation": "Use error detection first; only emit success defaults when no error fields are present."
+        }
+      ],
+      "work_items": [
+        "emit-tool-result-on-tool-use-summary.md",
+        "emit-tool-error-on-tool-use-summary.md"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T02:48:14Z",
+    "work_item": null,
+    "parent_packet": "2026-01-26T02-44-10-explore-options.json"
+  }
+}

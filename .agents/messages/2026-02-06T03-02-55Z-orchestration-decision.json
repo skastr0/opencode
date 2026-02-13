@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Routing review UI request to explore phase with parallel feasibility probes",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Use full explore path and dispatch multiple explorer agents in parallel",
+      "rationale": "Feature spans TUI navigation, git data plumbing, diff rendering, interaction model, and prompt integration. Multiple viable approaches exist and feasibility should be de-risked first.",
+      "from_phase": "request",
+      "to_phase": "exploring",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:02:55Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": null,
+    "blocking": false
+  }
+}

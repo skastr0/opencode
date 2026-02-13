@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Reviewed and corrected commit-phase work items using explorer + upstream PR context",
+    "data": {
+      "work_item": "git-review-ui.md",
+      "decision": "Refined committed work items to enforce project-scoped git source, directory-grouped sidebar, stage-aware diff selection, and append-to-prompt submission semantics",
+      "rationale": "The initial commit packet had useful structure but missed key constraints from exploration and user intent (tree view in scope, no auto-send on submit, and stage-aware diffs). Updated criteria now align with feasibility findings and pragmatic scope boundaries.",
+      "from_phase": "committed",
+      "to_phase": "committed",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T03:27:32Z",
+    "work_item": "git-review-ui.md",
+    "parent_packet": "2026-02-06T03-18-22Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

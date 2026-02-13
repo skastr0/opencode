@@ -1,0 +1,49 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented thinking defaults and merge-order validation for agent.thinking alignment.",
+    "data": {
+      "work_item": "debug-opus-bad-requests-thinking-alignment.md",
+      "files_changed": [
+        "packages/opencode/src/session/thinking-effort.ts",
+        "packages/opencode/src/session/llm.ts",
+        "packages/opencode/test/session/thinking-effort.test.ts",
+        "packages/opencode/test/session/llm.test.ts"
+      ],
+      "files_added": [],
+      "tests_added": [
+        "packages/opencode/test/session/thinking-effort.test.ts",
+        "packages/opencode/test/session/llm.test.ts"
+      ],
+      "validation_results": {
+        "tests": "pass",
+        "types": "pass",
+        "lint": "not_run"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "agent.thinking defaults use ThinkingEffort budgets when budgetTokens is unset.",
+          "status": "met"
+        },
+        {
+          "criterion": "Variant options remain authoritative and ProviderTransform.variants behavior is unchanged.",
+          "status": "met"
+        },
+        {
+          "criterion": "Unit checks or assertions validate default budgets and merge order for thinking options.",
+          "status": "met"
+        }
+      ],
+      "notes": "Added ThinkingEffort.resolve/budgetFor helpers and mergeOptions to keep variant overrides authoritative; updated tests for defaults and merge order. Initial bun test from repo root failed due to do-not-run-tests-from-root config, reran from packages/opencode.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-21T07:44:27Z",
+    "work_item": "debug-opus-bad-requests-thinking-alignment.md",
+    "parent_packet": "2026-01-20T22-57-58Z-commit-plan.json"
+  }
+}

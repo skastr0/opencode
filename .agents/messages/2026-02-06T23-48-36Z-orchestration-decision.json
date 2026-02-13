@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Applied hotfix for /changes fatal crash in FileList selection remap",
+    "data": {
+      "work_item": "changes-sidebar-collapsible-filter.md",
+      "decision": "Guard selection-remap effect against empty visibleRows before indexed access",
+      "rationale": "User-reported crash (`undefined is not an object (evaluating 'rows[i].type')`) occurred when `visibleRows` became empty and loop started at index -1. Early return prevents invalid access while preserving behavior.",
+      "from_phase": "building",
+      "to_phase": "building",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T23:48:36Z",
+    "work_item": "changes-sidebar-collapsible-filter.md",
+    "parent_packet": "2026-02-06T22-18-55Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

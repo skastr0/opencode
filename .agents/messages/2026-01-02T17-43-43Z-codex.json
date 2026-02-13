@@ -1,0 +1,37 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "findings",
+    "data": {
+      "findings": [
+        {
+          "id": "F-101",
+          "agent": "codex",
+          "title": "Subagent sessions display primary agent because UI agent list excludes subagents",
+          "severity": "medium",
+          "confidence": 0.7,
+          "evidence": {
+            "files": [
+              "packages/opencode/src/cli/cmd/tui/context/local.tsx:36",
+              "packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx:194"
+            ],
+            "tests": [],
+            "metrics": {}
+          },
+          "rationale": "When entering a subagent session, the prompt view tries to set the active agent from the last user message, but the local agent list filters out subagents, so the set fails and the primary agent remains displayed.",
+          "suggested_fix": "Allow subagents in local agent list for child sessions or store/read an explicit session agent and render it separately from the selectable primary agents.",
+          "links": []
+        }
+      ],
+      "summary": "0 critical, 0 high, 1 medium, 0 low",
+      "block_release": false
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T17:43:43Z",
+    "priority": "medium",
+    "blocking": false
+  }
+}

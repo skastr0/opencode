@@ -1,0 +1,107 @@
+{
+  "from": "security-reviewer",
+  "to": "orchestrator|all",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Security review findings for claude-agent-sdk integration (origin/dev diff)",
+    "data": {
+      "scan_scope": {
+        "method": "git diff --merge-base origin/HEAD --name-only",
+        "files_scanned": 20,
+        "sources_identified": 6,
+        "sources_investigated": 6
+      },
+      "findings": [
+        {
+          "id": "SEC-001",
+          "severity": "MEDIUM",
+          "category": "data",
+          "type": "Sensitive Data in Logs",
+          "title": "Tool input logged verbatim in metadata registry",
+          "source": {
+            "file": "packages/opencode/src/provider/native/tool-metadata-registry.ts",
+            "line": 28,
+            "snippet": "const json = typeof input === \"string\" ? input : JSON.stringify(input)"
+          },
+          "sink": {
+            "file": "packages/opencode/src/provider/native/tool-metadata-registry.ts",
+            "line": 44,
+            "snippet": "log.info(\"store\", { tool, key: k, metaKeys: Object.keys(data.metadata ?? {}) })"
+          },
+          "flow": [
+            "Tool args (e.g., task.prompt/task.description)",
+            "→ ToolMetadataRegistry.store(tool, input, metadata)",
+            "→ key() JSON.stringify(input)",
+            "→ log.info() writes key to logs"
+          ],
+          "sanitization": "None",
+          "verification": {
+            "in_executable_code": true,
+            "exploitable": true,
+            "reachable": true,
+            "has_impact": true,
+            "fixable": true
+          },
+          "attack_vector": "Invoke task tool with a prompt containing secrets; the JSON-stringified input is logged as the registry key.",
+          "impact": "Sensitive prompt/tool input can be persisted in logs or telemetry systems.",
+          "recommendation": "Remove raw key logging or replace with a stable hash/redacted summary.",
+          "code_fix": "const keyHash = Bun.hash.xxHash32(json).toString(16); log.info(\"store\", { tool, key: keyHash, metaKeys: Object.keys(data.metadata ?? {}) })",
+          "references": ["CWE-532", "OWASP A02:2021"],
+          "blocking": false
+        },
+        {
+          "id": "SEC-002",
+          "severity": "LOW",
+          "category": "session",
+          "type": "Cross-Session Metadata Leakage",
+          "title": "Metadata registry key lacks session scoping",
+          "source": {
+            "file": "packages/opencode/src/tool/task.ts",
+            "line": 110,
+            "snippet": "ctx.metadata({ metadata: { sessionId: session.id, model } })"
+          },
+          "sink": {
+            "file": "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+            "line": 92,
+            "snippet": "const stored = ToolMetadataRegistry.retrieve(toolName, info?.input)"
+          },
+          "flow": [
+            "TaskTool metadata includes sessionId",
+            "→ ToolMetadataRegistry.store(tool, args, metadata)",
+            "→ key() uses tool+input only (no session scope)",
+            "→ ToolMetadataRegistry.retrieve(tool, input)",
+            "→ metadata attached to tool-result for a different session"
+          ],
+          "sanitization": "None",
+          "verification": {
+            "in_executable_code": true,
+            "exploitable": true,
+            "reachable": true,
+            "has_impact": true,
+            "fixable": true
+          },
+          "attack_vector": "Two sessions invoke task tool with identical prompt/description within TTL; metadata from the first can attach to the second.",
+          "impact": "Cross-session disclosure of session IDs and tool metadata (summary/model).",
+          "recommendation": "Key metadata by sessionID/messageID/toolCallId or include session namespace in the registry key.",
+          "code_fix": "function key(tool: string, input: unknown, sessionID: string) { return `${sessionID}::${tool}::${hash}` }",
+          "references": ["CWE-200"],
+          "blocking": false
+        }
+      ],
+      "summary": {
+        "critical": 0,
+        "high": 0,
+        "medium": 1,
+        "low": 1,
+        "total": 2,
+        "blocking": false
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T19:04:55Z",
+    "work_item": null,
+    "blocking": false
+  }
+}

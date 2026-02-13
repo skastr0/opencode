@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Completed WI-02 build and started WI-03 footer hint updates",
+    "data": {
+      "work_item": "03-footer-hints-update.md",
+      "decision": "Advance WI-02 to reviewing and implement WI-03 next",
+      "rationale": "WI-02 functionality is implemented and typechecked. WI-03 is a small dependent UX polish item and is faster to complete before consolidated review.",
+      "from_phase": "building",
+      "to_phase": "building",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T21:53:43Z",
+    "work_item": "03-footer-hints-update.md",
+    "parent_packet": "2026-02-06T21-50-08Z-orchestration-decision.json",
+    "blocking": false
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Claude Agent SDK provider implementation COMPLETE",
+    "data": {
+      "work_items_completed": [
+        "claude-agent-sdk-models",
+        "claude-agent-sdk-sessions",
+        "claude-agent-sdk-streaming",
+        "claude-agent-sdk-language-model"
+      ],
+      "files_created": [
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/index.ts",
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/models.ts",
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/session-store.ts",
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/claude-agent-sdk-model.ts",
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-prompt.ts",
+        "packages/opencode/src/provider/sdk/claude-agent-sdk/translate-stream.ts",
+        "packages/opencode/test/provider/sdk/claude-agent-sdk/translate.test.ts"
+      ],
+      "files_modified": [
+        "packages/opencode/src/provider/provider.ts"
+      ],
+      "validation": {
+        "tests": "808 pass, 0 fail",
+        "typecheck": "clean",
+        "new_tests": "16 tests for translate functions"
+      },
+      "decision": "All acceptance criteria met, work complete",
+      "remaining": "claude-agent-sdk-testing.md (E2E tests) in backlog"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T12:45:00Z",
+    "work_item": "claude-agent-sdk-provider"
+  }
+}

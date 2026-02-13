@@ -1,0 +1,53 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Session resumption and tracking are inconsistent across OpenCode, Vercel AI SDK, and Claude Agent SDK; Task tool subagent sessions do not reliably resume because session IDs are not consistently propagated or persisted.",
+      "constraints": [
+        "Explore phase only; no implementation work in this packet.",
+        "OpenCode session IDs are local and stored in Storage; provider sessions are separate.",
+        "Claude Agent SDK session_id mapping is currently in-memory.",
+        "Task tool resume requires session_id input; current linkage is only via tool output metadata."
+      ],
+      "options": [
+        {
+          "name": "Propagate OpenCode sessionId into Claude Agent SDK providerOptions",
+          "approach": "Use OpenCode sessionID (and messageID where available) as providerOptions['claude-agent-sdk'].sessionId so the SDK session store keys per OpenCode session. Verify tool-bridge now receives a valid ses_* sessionID and that SDK resume tokens are isolated per session.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Whether the default 'default' sessionKey is causing session collisions and tool-bridge context loss; whether resume starts working per session.",
+          "risk_if_wrong": "Medium (may not fix Task tool resume or cross-process persistence).",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Persist SDK session IDs + Task subagent linkage",
+          "approach": "Store claude-agent-sdk session_id per OpenCode session in Storage; persist parent→child session mapping for Task tool runs. Use stored session_id to resume subagent sessions automatically.",
+          "time_to_learning": "0.5-1 day",
+          "what_we_learn": "Whether persistence and explicit linkage resolve resume issues across restarts and subagent flows.",
+          "risk_if_wrong": "Medium-High (storage schema changes; migration concerns).",
+          "reversibility": "medium",
+          "rank": 2
+        },
+        {
+          "name": "Disable SDK resume and rely on OpenCode history",
+          "approach": "Avoid using claude-agent-sdk resume tokens; always run stateless SDK calls with full OpenCode message history.",
+          "time_to_learning": "1 hour",
+          "what_we_learn": "Whether resume-related bugs disappear when provider-native sessions are bypassed.",
+          "risk_if_wrong": "Medium (loss of SDK-native state/tool memory; potential regressions).",
+          "reversibility": "high",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it is the fastest way to validate the likely root cause (missing sessionId propagation) and should immediately improve session isolation and tool tracking if correct."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:41:32Z",
+    "work_item": null,
+    "parent_packet": "2026-01-25T23-41-32Z-explore-research.json"
+  }
+}

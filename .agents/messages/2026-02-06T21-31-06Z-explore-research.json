@@ -1,0 +1,94 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: /changes sidebar collapsible tree, fuzzy filter, and keyboard-safe navigation",
+    "data": {
+      "original_input": "Explore implementation options for /changes sidebar enhancements: true collapsible directory nodes under staged/unstaged/untracked, fuzzy filename/path filter, preserved keyboard selection+diff behavior, and runtime verification for comment reset fix.",
+      "codebase_findings": [
+        {
+          "topic": "Sidebar data source and stage model",
+          "details": "FileList fetches sdk.client.file.status() and normalizes each entry into {id, path, added, removed, status, stage}. IDs are stage-qualified (\"stage:path\"), so the same file can appear in multiple stages without collisions.",
+          "files": [
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:61",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:68"
+          ]
+        },
+        {
+          "topic": "Current grouping is directory headers, not collapsible nodes",
+          "details": "Grouping is computed per stage using dirname(path) buckets and rendered as static directory labels with all children always visible. There is no expand/collapse state and no nested tree structure.",
+          "files": [
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:78",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:83",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:231"
+          ]
+        },
+        {
+          "topic": "Selection and diff coupling",
+          "details": "Selection is index-based over a flat file list derived from groups(). A createEffect emits onSelect whenever selected() changes, which drives DiffPane loading. Mouse click sets index through an id->index map and calls choose() for explicit selection.",
+          "files": [
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:109",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:118",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:122",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:247"
+          ]
+        },
+        {
+          "topic": "Keyboard flow and hotkey isolation",
+          "details": "Three keyboard handlers are active in /changes: route-level (Shift+S submit, Esc close), file-list-level (up/down/j/k, Enter select, r refresh), and diff-pane-level (c comment). All are gated only by dialog.stack.length > 0.",
+          "files": [
+            "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx:58",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/file-list.tsx:167",
+            "packages/opencode/src/cli/cmd/tui/routes/changes/diff-pane.tsx:249"
+          ]
+        },
+        {
+          "topic": "Fuzzy-search prior art in this codebase",
+          "details": "The codebase already uses fuzzysort in TUI components and core file search. DialogSelect demonstrates local input + fuzzy ranking + selected-row behavior with keyboard navigation.",
+          "files": [
+            "packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:7",
+            "packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:85",
+            "packages/opencode/src/file/index.ts:13",
+            "packages/opencode/src/file/index.ts:683"
+          ]
+        },
+        {
+          "topic": "Comment reset fix location",
+          "details": "Submit currently clears comments with setComments(() => []) before navigation. This is the reported fix and is in the expected location.",
+          "files": [
+            "packages/opencode/src/cli/cmd/tui/routes/changes/index.tsx:50"
+          ]
+        }
+      ],
+      "prior_art": [
+        "learn retrospective confirms /changes architecture is stable and suggests extracting FileList grouping to a pure transformer for testability: .agents/messages/2026-02-06T04-15-00Z-learn-retrospective.json",
+        "backlog item already exists for extraction: .agents/sdlc/backlog/extract-filelist-grouping-logic.md",
+        "session sidebar has proven expand/collapse UI pattern with chevrons and section state: packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx:24"
+      ],
+      "patterns": [
+        "A single derived flat 'visible rows' model is the safest bridge between tree UI and existing index-based keyboard selection.",
+        "Keep stage-qualified identity keys (stage:path) end-to-end to avoid cross-stage selection collisions.",
+        "When filters hide current selection, remap by selected id first, then fallback to nearest visible row to preserve diff continuity.",
+        "For TUI keyboard safety, explicit focus/edit mode flags are needed in addition to dialog-stack checks when adding inline input fields.",
+        "Collapse-state persistence should be key-based and pruned against current tree paths after refresh to satisfy AC-2."
+      ],
+      "raw_options": [
+        "Inline refactor in file-list.tsx: add tree nodes + visible row projection + per-stage collapse map + fuzzysort filter.",
+        "Extract pure view-model transformer (tree + filter + visible rows) into a helper module, then keep file-list rendering thin.",
+        "Hybrid UX: keep static directory labels but add fuzzy filter and parent-path context only (defer true collapse).",
+        "Add dedicated filter-focus mode and explicit key routing (enter/esc/tab) to isolate typing from global /changes hotkeys.",
+        "Server-assisted filtering endpoint for very large repos (likely overkill for current ACs).",
+        "Incremental rollout: first collapsible tree with stable selection, then fuzzy filter on same row model.",
+        "Use existing DialogSelect mechanics as reference for local fuzzysort scoring and selected-row behavior.",
+        "Preserve current onSelect side effects by keeping file leaves as the only selectable rows and non-leaf rows toggle-only."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-06T21:31:06Z",
+    "work_item": "changes-sidebar-collapsible-filter.md",
+    "parent_packet": "2026-02-06T21-26-41Z-orchestration-decision.json"
+  }
+}

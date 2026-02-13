@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Moved Rust debugger initiative from exploring to committed with scoped codelldb-only work items",
+    "data": {
+      "work_item": "rust-dap-debugger-plugin-research.md",
+      "decision": "Adopt codelldb-only MVP and create six committed buildable work items with explicit discovery references and research leads",
+      "rationale": "User requested tight scope and straightforward implementation while retaining core debugger capability",
+      "from_phase": "exploring",
+      "to_phase": "committed",
+      "confidence": "high"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-02-13T13:01:05Z",
+    "work_item": "rust-dap-debugger-plugin-research.md",
+    "parent_packet": "2026-02-13T12-41-07Z-orchestration-orchestrator-engineer.json",
+    "blocking": false
+  }
+}

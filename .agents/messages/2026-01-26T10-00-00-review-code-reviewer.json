@@ -1,0 +1,47 @@
+{
+  "from": "code-reviewer",
+  "to": "orchestrator",
+  "phase": "review",
+  "type": "findings",
+  "content": {
+    "summary": "Fix verified: Metadata propagation correctly implemented using registry pattern",
+    "data": {
+      "change_summary": "Retrieves stored tool metadata during stream processing to restore context (like session IDs) lost during MCP execution.",
+      "files_reviewed": [
+        "packages/opencode/src/provider/native/claude-agent-sdk.ts",
+        "packages/opencode/src/provider/native/tool-metadata-registry.ts",
+        "packages/opencode/src/provider/native/tool-bridge.ts"
+      ],
+      "context_files": [
+        "packages/opencode/src/provider/native/tool-metadata-registry.ts"
+      ],
+      "findings": [
+        {
+          "line": 24,
+          "file": "packages/opencode/src/provider/native/tool-metadata-registry.ts",
+          "severity": "LOW",
+          "category": "reliability",
+          "summary": "Key generation relies on JSON key order",
+          "explanation": "Using `JSON.stringify(input)` as a map key assumes deterministic key ordering. While likely safe here since inputs originate from the same source, it is technically brittle.",
+          "suggestion": "If cache misses occur, switch to a stable stringify function that sorts keys."
+        }
+      ],
+      "positive_highlights": [
+        "Correct consume-once retrieval prevents memory growth",
+        "TTL mechanism safely handles orphaned entries",
+        "Queue-based storage correctly handles concurrent identical tool calls",
+        "Merge logic correctly prioritizes rich metadata while preserving summaries"
+      ],
+      "overall": {
+        "status": "approve",
+        "blocking_count": 0,
+        "summary": "The solution effectively bridges the context gap between tool execution and stream processing. The implementation is thread-safe for the JS event loop and includes proper cleanup."
+      }
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T10:00:00Z",
+    "work_item": "fix-mcp-metadata",
+    "blocking": false
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning for getting OpenCode MCP tools to appear with Claude Agent SDK.",
+    "data": {
+      "problem": "OpenCode MCP tools do not appear in the tool list when using Claude Agent SDK V2 because unstable_v2_createSession does not accept or wire mcpServers, so in-process MCP servers are ignored.",
+      "constraints": [
+        "Need OpenCode MCP tools available in model tool list.",
+        "Prefer minimal integration changes and fast validation.",
+        "In-process MCP server is ideal but not required if it blocks progress."
+      ],
+      "options": [
+        {
+          "name": "Use V1 query API with setMcpServers",
+          "approach": "Replace V2 session usage with V1 query() (streaming input) and call setMcpServers or pass options.mcpServers using createSdkMcpServer output; wrap Query to emulate session send/stream if needed.",
+          "time_to_learning": "1-3 hours",
+          "what_we_learn": "Whether MCP tools appear when using supported V1 MCP configuration; confirms tool naming/allowedTools filters.",
+          "risk_if_wrong": "Medium: may require small refactor of streaming/session wrapper.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Keep V2, externalize MCP server via CLI settings",
+          "approach": "Run OpenCode MCP server as stdio/http/sse and register it in Claude Code settings so V2 picks it up from CLI config; keep V2 session code unchanged.",
+          "time_to_learning": "0.5-1 day",
+          "what_we_learn": "Whether V2 surfaces MCP servers from settings and whether externalizing is viable operationally.",
+          "risk_if_wrong": "Medium: extra infra/config and loss of in-process context.",
+          "reversibility": "medium",
+          "rank": 2
+        },
+        {
+          "name": "Patch/fork SDK to add V2 mcpServers support",
+          "approach": "Fork claude-agent-sdk and wire SDKSessionOptions.mcpServers through to the internal Query/setMcpServers path; update dependencies.",
+          "time_to_learning": "1-2 days",
+          "what_we_learn": "Whether V2 can support in-process MCP with minimal upstream changes.",
+          "risk_if_wrong": "High: ongoing maintenance and upgrade friction.",
+          "reversibility": "low",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it uses the SDK's supported MCP path (query + setMcpServers) and yields the fastest confirmation that OpenCode tools can appear without forking or external servers."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T01:34:20Z",
+    "work_item": null,
+    "parent_packet": "2026-01-26T01-34-20-explore-research.json"
+  }
+}

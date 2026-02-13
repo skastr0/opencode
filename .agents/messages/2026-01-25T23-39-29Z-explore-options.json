@@ -1,0 +1,53 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Understand the native Claude Agent SDK API (query/stream inputs, streaming events, tool protocol, sessions, MCP) to enable direct integration without Vercel AI SDK.",
+      "constraints": [
+        "Stay within explore phase (no implementation).",
+        "Use native SDK behavior, not Vercel abstractions.",
+        "Confirm event/message shapes for streaming, tool_use/tool_result, and session_id/resume.",
+        "Account for MCP integration and permissions model."
+      ],
+      "options": [
+        {
+          "name": "Minimal raw query probe",
+          "approach": "Run a tiny standalone query() call (outside OpenCode) to log raw messages for a simple prompt + tool call. Compare outputs to translate-stream expectations (system/assistant/partial/tool_progress/tool_use_summary/result).",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Actual SDK message/event types and fields, session_id location, tool_use blocks, and presence of result messages.",
+          "risk_if_wrong": "Low - no integration changes, just observational.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Direct SDK integration behind the existing translator",
+          "approach": "Conceptually replace the Vercel wrapper with direct query() using existing translate-prompt/translate-stream and tool bridge. Validate that known events map cleanly (system/assistant/partial/tool_progress/tool_use_summary).",
+          "time_to_learning": "0.5-1 day",
+          "what_we_learn": "Whether current translation layer fully covers native SDK streams and tool flows.",
+          "risk_if_wrong": "Medium - integration surface area may hide unhandled events like result/subtype.",
+          "reversibility": "medium",
+          "rank": 2
+        },
+        {
+          "name": "Full native session and MCP configuration pass",
+          "approach": "Model how resume/forkSession/continue, allowedTools/permissionMode, and external mcpServers would be exposed to callers. Map these options to OpenCode provider options.",
+          "time_to_learning": "1-2 days",
+          "what_we_learn": "Complete parity with SDK session and MCP features and any missing abstractions in OpenCode.",
+          "risk_if_wrong": "Medium-High - broad design assumptions before observing real streams.",
+          "reversibility": "medium",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it yields the fastest, lowest-risk confirmation of the native SDK event and session formats before committing to integration changes."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:39:29Z",
+    "work_item": null,
+    "parent_packet": "2026-01-25T23-39-29Z-explore-research.json"
+  }
+}

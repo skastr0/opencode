@@ -1,0 +1,37 @@
+{
+  "from": "codex",
+  "to": "all",
+  "stage": "code-review",
+  "content": {
+    "type": "findings",
+    "data": {
+      "findings": [
+        {
+          "id": "F-301",
+          "agent": "codex",
+          "title": "Child-session cycling includes the parent, so 'next subagent' can land on primary session",
+          "severity": "medium",
+          "confidence": 0.77,
+          "evidence": {
+            "files": [
+              "packages/opencode/src/cli/cmd/tui/routes/session/index.tsx:270",
+              "packages/opencode/src/cli/cmd/tui/routes/session/index.tsx:278"
+            ],
+            "tests": [],
+            "metrics": {}
+          },
+          "rationale": "moveChild builds a list of sessions that includes both the parent and all children, then cycles by id. From a child session, pressing 'next child' can navigate to the parent, which shows the primary agent/model.",
+          "suggested_fix": "Filter out the parent when cycling children (keep parent navigation on session_parent) or make the UI label explicitly say it cycles parent+children.",
+          "links": []
+        }
+      ],
+      "summary": "0 critical, 0 high, 1 medium, 0 low",
+      "block_release": false
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-02T17:54:30Z",
+    "priority": "medium",
+    "blocking": false
+  }
+}

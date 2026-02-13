@@ -1,0 +1,52 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Thinking effort/option triggers an error when using model opencode/kimi-k2.5. Need to determine whether the model is misdefined (reasoning/interleaved flags), whether thinking options are incorrectly mapped for openai-compatible providers, or whether kimi-specific enablement is missing.",
+      "constraints": [
+        "Bundled models snapshot does not include kimi-k2.5; runtime data may differ.",
+        "Agent thinking options are only mapped for specific SDK providers (not openai-compatible/opencode).",
+        "Kimi-specific enable_thinking is only set for kimi-k2-thinking today."
+      ],
+      "options": [
+        {
+          "name": "Verify opencode/kimi-k2.5 model definition",
+          "approach": "Inspect live models.dev data or cached models.json to confirm whether kimi-k2.5 exists, its reasoning/interleaved flags, and any model-specific options. Compare with snapshot and existing kimi-k2/kimi-k2-thinking entries.",
+          "time_to_learning": "15–30 minutes",
+          "what_we_learn": "Whether the model is actually marked reasoning/interleaved, and if the repo snapshot is stale or missing k2.5-specific metadata.",
+          "risk_if_wrong": "Low—read-only investigation.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Trace request options for thinking-enabled k2.5",
+          "approach": "Reproduce the error with opencode/kimi-k2.5 and thinking/variant enabled. Capture the built request options/body (providerOptions + params) and compare against a non-thinking run or kimi-k2-thinking.",
+          "time_to_learning": "30–60 minutes",
+          "what_we_learn": "Which options are being sent when thinking is enabled and which parameter causes the error (e.g., reasoningEffort vs missing chat_template_args).",
+          "risk_if_wrong": "Medium—requires reproduction and log access.",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Hypothesis test: disable or remap thinking for k2.5",
+          "approach": "Temporarily disable variants for k2.5 or add chat_template_args.enable_thinking when thinking is enabled, then re-run to see if error disappears. This isolates whether Kimi needs explicit thinking enablement or variant suppression.",
+          "time_to_learning": "45–90 minutes",
+          "what_we_learn": "Whether the failure is tied to reasoningEffort being sent or to missing Kimi-specific enable_thinking flags.",
+          "risk_if_wrong": "Medium—requires local changes but is reversible.",
+          "reversibility": "high",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it is the fastest way to confirm whether opencode/kimi-k2.5 is correctly defined and whether its reasoning/interleaved flags or metadata are mismatched, which directly influences how thinking options are applied."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-27T19-18-15Z",
+    "work_item": null,
+    "parent_packet": "2026-01-27T19-18-15Z-explore-research.json"
+  }
+}

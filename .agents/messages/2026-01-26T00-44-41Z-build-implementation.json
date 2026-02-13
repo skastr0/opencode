@@ -1,0 +1,57 @@
+{
+  "from": "builder",
+  "to": "caller",
+  "phase": "build",
+  "type": "implementation",
+  "content": {
+    "summary": "Implemented claude-agent-sdk native routing in LLM.stream",
+    "data": {
+      "work_item": "claude-v2-llm-routing.md",
+      "files_changed": [
+        "packages/opencode/src/session/llm.ts",
+        ".agents/sdlc/reviewing/claude-v2-llm-routing.md"
+      ],
+      "files_added": [],
+      "tests_added": [],
+      "validation_results": {
+        "tests": "pass (bun test test/session/llm.test.ts)",
+        "types": "pass (bun run typecheck)",
+        "lint": "pass (bun run lint)"
+      },
+      "acceptance_criteria_status": [
+        {
+          "criterion": "AC-1: Detect when model uses claude-agent-sdk provider",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-2: Route claude-agent-sdk models to native streamClaudeNative()",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-3: Keep all other providers on existing streamText() path",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-4: Pass OpenCode session ID properly to native path",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-5: Ensure tools from ToolRegistry are available to native path",
+          "status": "met"
+        },
+        {
+          "criterion": "AC-6: Return stream compatible with existing SessionProcessor consumption",
+          "status": "met"
+        }
+      ],
+      "notes": "Native claude-agent-sdk routing now builds a LanguageModelV2 prompt with system messages, resumes SDK sessions via ClaudeAgentSDKSessionStore, and wraps native streams with a lazy text accessor for summary/title flows.",
+      "blockers": []
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T00:44:41Z",
+    "work_item": "claude-v2-llm-routing.md",
+    "parent_packet": null,
+    "blocking": false
+  }
+}

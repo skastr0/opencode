@@ -1,0 +1,63 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Research findings for: OpenCode plugin + tool registry system for Claude Agent SDK exposure",
+    "data": {
+      "original_input": "Exploration Task: OpenCode Plugin and Tool Registry System. Objective: Understand how OpenCode's plugin system and tool registry work, so we can expose these tools to Claude Agent SDK. Files: packages/opencode/src/tool/registry.ts, packages/opencode/src/tool/tool.ts, packages/opencode/src/plugin/, packages/opencode/src/mcp/index.ts, packages/opencode/src/session/prompt.ts. Questions: how tools are registered, Tool interface, plugin system, MCP.tools, tool conversion to AI SDK, tool metadata, tool execution.",
+      "codebase_findings": [
+        {
+          "topic": "Tool base definition",
+          "file": "packages/opencode/src/tool/tool.ts",
+          "notes": "Tool.Info has id + init() returning description, parameters (Zod), execute(args, ctx) -> {title, metadata, output, attachments?}. Tool.Context includes sessionID, messageID, agent, abort, callID, metadata(), ask(). Tool.define validates args with Zod, formats validation errors, and truncates output unless tool already set metadata.truncated."
+        },
+        {
+          "topic": "Tool registry",
+          "file": "packages/opencode/src/tool/registry.ts",
+          "notes": "ToolRegistry.state loads custom tools from Config.directories() using Bun.Glob for {tool,tools}/*.{js,ts}, imports ToolDefinition exports, and converts to Tool.Info via fromPlugin(). It also loads Plugin.list() hooks and pulls hook.tool entries into custom tools. Built-in tools are appended in all(); register() can replace or add tools by id."
+        },
+        {
+          "topic": "Plugin hook types",
+          "file": "packages/plugin/src/index.ts",
+          "notes": "Hooks includes tool?: Record<string, ToolDefinition>. PluginInput provides SDK client, project, worktree, directory, server URL, Bun shell. Plugin list is loaded in opencode via packages/opencode/src/plugin/index.ts and collected by Plugin.list()."
+        },
+        {
+          "topic": "Plugin tool definition shape",
+          "file": "packages/plugin/src/tool.ts",
+          "notes": "tool({ description, args, execute }) returns ToolDefinition. args is Zod raw shape; execute(args, context) returns string. ToolContext mirrors runtime context (sessionID, messageID, agent, abort, metadata, ask)."
+        },
+        {
+          "topic": "MCP tool conversion",
+          "file": "packages/opencode/src/mcp/index.ts",
+          "notes": "MCP.tools() returns Record<string, AI SDK Tool>. It lists tools from connected MCP clients, sanitizes names, and wraps each MCP tool via convertMcpTool(): dynamicTool({ description, inputSchema: jsonSchema(JSONSchema7), execute: client.callTool(...) })."
+        },
+        {
+          "topic": "Tool-to-AI-SDK conversion and execution",
+          "file": "packages/opencode/src/session/prompt.ts",
+          "notes": "resolveTools() builds AI SDK tools from ToolRegistry.tools(): inputSchema = jsonSchema(ProviderTransform.schema(model, z.toJSONSchema(parameters))). Execution wraps plugin hooks (tool.execute.before/after) and uses Tool.Context to update metadata and permissions. MCP tools are pulled from MCP.tools() and wrapped to enforce permissions, attach files, and truncate output."
+        }
+      ],
+      "prior_art": [],
+      "patterns": [
+        "Tool metadata is consistently { id, description, parameters (Zod), execute -> { title, output, metadata, attachments? } }.",
+        "Tool exposure to the model is centralized in SessionPrompt.resolveTools: Zod -> JSON schema -> AI SDK tool().",
+        "MCP tools bypass Tool.Info and are already AI SDK Tool objects returned by MCP.tools().",
+        "Plugin tools are injected via Hooks.tool and merged into ToolRegistry custom tools."
+      ],
+      "raw_options": [
+        "Adapter-only: convert ToolRegistry.tools() + MCP.tools() into Claude Agent SDK tool schema in-process.",
+        "Add server endpoints to list tools and execute by id, reusing SessionPrompt tooling pipeline.",
+        "MCP-first: expose internal tools through an MCP server and consume via MCP in Claude Agent SDK.",
+        "CLI export: add a command that dumps tool catalog JSON for Claude Agent SDK to consume.",
+        "Plugin-based bridge: create a plugin that formats tools for Claude SDK and forwards tool calls to ToolRegistry/MCP."
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T12:00:00Z",
+    "work_item": null,
+    "parent_packet": null
+  }
+}

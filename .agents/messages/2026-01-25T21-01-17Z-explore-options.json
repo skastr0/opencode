@@ -1,0 +1,53 @@
+{
+  "from": "explorer",
+  "to": "caller",
+  "phase": "explore",
+  "type": "options",
+  "content": {
+    "summary": "Options ranked by time-to-learning",
+    "data": {
+      "problem": "Expose OpenCode Task tool and subagent system to Claude Agent SDK with enough surface for agent selection, session continuation, and result parsing.",
+      "constraints": [
+        "Explore phase only; no implementation changes",
+        "Agent list is dynamic from config; subagents are mode!=primary",
+        "Task output includes session_id footer and metadata summary",
+        "Delegation depth and permissions can disable nested task calls"
+      ],
+      "options": [
+        {
+          "name": "Spec snapshot mapping",
+          "approach": "Map Task tool Zod schema + output contract (including <task_metadata> session_id) and pair with /agent list endpoint to define SDK surface.",
+          "time_to_learning": "1-2 hours",
+          "what_we_learn": "Exact fields needed for SDK requests/responses and how to continue tasks by session_id.",
+          "risk_if_wrong": "Might miss runtime nuances like tool part streaming.",
+          "reversibility": "high",
+          "rank": 1
+        },
+        {
+          "name": "Runtime trace",
+          "approach": "Run a Task invocation end-to-end, capture tool part updates, output formatting, and session storage state to validate the contract.",
+          "time_to_learning": "2-4 hours",
+          "what_we_learn": "Observed output format, metadata updates, and session continuation behavior.",
+          "risk_if_wrong": "Requires local environment setup; may be slower if setup issues arise.",
+          "reversibility": "high",
+          "rank": 2
+        },
+        {
+          "name": "Full agent config surface mapping",
+          "approach": "Map Config.Agent frontmatter and permission rules to SDK configuration schema, including steps, thinking, hidden, and options.",
+          "time_to_learning": "4-6 hours",
+          "what_we_learn": "Complete parity between OpenCode agent configs and SDK representation.",
+          "risk_if_wrong": "More complex; may overfit to internal details not needed by SDK.",
+          "reversibility": "medium",
+          "rank": 3
+        }
+      ],
+      "recommendation": "Option 1 because it gives the fastest, lowest-risk contract definition for SDK integration and keeps further investigation targeted."
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T21-01-17Z",
+    "work_item": null,
+    "parent_packet": "2026-01-25T21-01-17Z-explore-research.json"
+  }
+}

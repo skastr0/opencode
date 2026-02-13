@@ -1,0 +1,31 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Fast path: cleanup obsolete AI SDK wrapper for Claude Agent SDK",
+    "data": {
+      "work_item": "cleanup-ai-sdk-wrapper.md",
+      "decision": "Skip explore phase - task is well-understood cleanup",
+      "rationale": "Removing obsolete code that has been superseded by native implementation. Clear scope, low risk, no architectural decisions needed.",
+      "from_phase": "backlog",
+      "to_phase": "committed",
+      "confidence": "high",
+      "files_to_remove": [
+        "src/provider/sdk/claude-agent-sdk/",
+        "test/provider/sdk/claude-agent-sdk/"
+      ],
+      "files_to_keep": [
+        "src/provider/native/claude-agent-sdk.ts",
+        "test/provider/native/claude-agent-sdk.test.ts"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T12:00:00Z",
+    "work_item": "cleanup-ai-sdk-wrapper.md",
+    "parent_packet": null,
+    "blocking": false
+  }
+}

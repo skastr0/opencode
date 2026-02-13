@@ -1,0 +1,53 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "explore",
+  "type": "research",
+  "content": {
+    "summary": "Investigated why Task tool shows 'Running' and never gets updated in Anthropic Agents SDK integration",
+    "data": {
+      "root_cause": "The Anthropic SDK may not be sending tool_use_summary events or they're not being parsed correctly",
+      "evidence": {
+        "user_observation": "Tool calls stuck on 'Running' until session stops, then marked 'aborted'",
+        "code_trace": {
+          "llm.ts": "Lines 248-282: When providerID='claude-agent-sdk', uses streamClaudeNative()",
+          "claude-agent-sdk.ts": "Lines 532-558: Handles tool_progress and tool_use_summary events",
+          "processor.ts": "Lines 172-198: Expects tool-result event to transition from 'running' to 'completed'",
+          "processor.ts_cleanup": "Lines 385-399: Sets incomplete tools to 'error' status with 'Tool execution aborted'"
+        }
+      },
+      "key_insight": "The processSDKMessage() function in claude-agent-sdk.ts only emits tool-result when it receives 'tool_use_summary' with a summary field (line 541). If the SDK never sends this event, tools stay 'running'.",
+      "options": [
+        {
+          "id": 1,
+          "title": "Add debug logging to trace SDK events",
+          "description": "Add logging in processSDKMessage() to see exactly what events the SDK sends. This reveals whether tool_use_summary is missing, malformed, or has different field names.",
+          "effort": "1 hour",
+          "risk": "low",
+          "time_to_learning": "fast - immediately reveals event flow"
+        },
+        {
+          "id": 2,
+          "title": "Check SDK documentation and update event handling",
+          "description": "Review @anthropic-ai/claude-agent-sdk docs to understand expected event types for MCP tool completion. May need to handle different event types or field names.",
+          "effort": "2-3 hours",
+          "risk": "medium",
+          "time_to_learning": "medium - requires SDK research"
+        },
+        {
+          "id": 3,
+          "title": "Fall back to assistant message tool completion",
+          "description": "The SDK might report tool completion via the 'assistant' message content blocks rather than separate tool_use_summary events. Check if tool_use blocks in assistant messages include completion info.",
+          "effort": "2-4 hours",
+          "risk": "medium",
+          "time_to_learning": "medium - requires testing"
+        }
+      ],
+      "recommendation": "Option 1 first - add debug logging to understand exactly what events the SDK sends, then decide on fix approach"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-25T23:30:00Z",
+    "work_item": "task-tool-session-enrichment.md"
+  }
+}

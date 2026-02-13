@@ -1,0 +1,23 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Start full explore for opus bad requests and thinking alignment",
+    "data": {
+      "work_item_id": "debug-opus-bad-requests",
+      "decision": "Proceed with explore phase before planning and build",
+      "rationale": "Multiple provider-specific thinking options and limited error visibility require investigation before committing to a fix.",
+      "from_phase": "new",
+      "to_phase": "exploring",
+      "confidence": "medium"
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-20T22:48:48Z",
+    "work_item": "debug-opus-bad-requests.md",
+    "parent_packet": null,
+    "blocking": false
+  }
+}

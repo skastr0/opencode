@@ -1,0 +1,72 @@
+{
+  "from": "orchestrator-engineer",
+  "to": "all",
+  "phase": "orchestration",
+  "type": "decision",
+  "content": {
+    "summary": "Completed logging system review and created 6 work items for improvements",
+    "data": {
+      "trigger": "User frustration with debugging 'exited with code 1' errors",
+      "findings": [
+        "Logs go to files by default, not terminal",
+        "Silent .catch(() => {}) swallows errors throughout codebase",
+        "Claude SDK subprocess stderr is not captured",
+        "Aggressive log rotation deletes evidence",
+        "No structured error codes for programmatic handling",
+        "No progressive verbosity flag"
+      ],
+      "documentation_created": [
+        "packages/opencode/docs/LOGGING.md"
+      ],
+      "work_items_created": [
+        {
+          "file": "print-logs-dev-default.md",
+          "priority": "high",
+          "effort": "small",
+          "rationale": "Quick fix with high impact on DX"
+        },
+        {
+          "file": "remove-silent-catches.md",
+          "priority": "high",
+          "effort": "medium",
+          "rationale": "Fixes root cause of invisible errors"
+        },
+        {
+          "file": "capture-sdk-subprocess-stderr.md",
+          "priority": "high",
+          "effort": "unknown",
+          "rationale": "May require upstream SDK changes"
+        },
+        {
+          "file": "configurable-log-retention.md",
+          "priority": "low",
+          "effort": "small",
+          "rationale": "Nice-to-have for historical debugging"
+        },
+        {
+          "file": "structured-error-codes.md",
+          "priority": "medium",
+          "effort": "medium",
+          "rationale": "Improves monitoring and programmatic handling"
+        },
+        {
+          "file": "verbose-flag.md",
+          "priority": "low",
+          "effort": "medium",
+          "rationale": "UX improvement for power users"
+        }
+      ],
+      "recommended_order": [
+        "print-logs-dev-default.md",
+        "remove-silent-catches.md",
+        "capture-sdk-subprocess-stderr.md"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": "2026-01-26T23:40:00Z",
+    "work_item": null,
+    "parent_packet": null,
+    "blocking": false
+  }
+}
