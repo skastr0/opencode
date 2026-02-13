@@ -1,12 +1,23 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { ModelMessage } from "ai"
 import z from "zod"
 import type { Agent } from "../../src/agent/agent"
-import type { Provider } from "../../src/provider/provider"
+import { Auth } from "../../src/auth"
+import { Config } from "../../src/config/config"
+import { Plugin } from "../../src/plugin"
+import { Provider } from "../../src/provider/provider"
 import type { MessageV2 } from "../../src/session/message-v2"
 import type { ClaudeNativeInput } from "../../src/provider/native/claude-agent-sdk"
 
 const calls: ClaudeNativeInput[] = []
+
+const originals = {
+  getLanguage: Provider.getLanguage,
+  getProvider: Provider.getProvider,
+  configGet: Config.get,
+  authGet: Auth.get,
+  pluginTrigger: Plugin.trigger,
+}
 
 const setupMocks = () => {
   ;(
@@ -19,31 +30,11 @@ const setupMocks = () => {
     return { fullStream: (async function* () {})() }
   }
 
-  mock.module("../../src/provider/provider", () => ({
-    Provider: {
-      getLanguage: async () => ({}),
-      getProvider: async () => ({ id: "claude-agent-sdk", options: {} }),
-    },
-  }))
-
-  mock.module("../../src/config/config", () => ({
-    Config: {
-      get: async () => ({ experimental: {} }),
-      Thinking: z.object({}),
-    },
-  }))
-
-  mock.module("../../src/auth", () => ({
-    Auth: {
-      get: async () => undefined,
-    },
-  }))
-
-  mock.module("../../src/plugin", () => ({
-    Plugin: {
-      trigger: async (_event: string, _ctx: unknown, payload: unknown) => payload,
-    },
-  }))
+  Provider.getLanguage = async () => ({})
+  Provider.getProvider = async () => ({ id: "claude-agent-sdk", options: {} })
+  Config.get = async () => ({ experimental: {} })
+  Auth.get = async () => undefined
+  Plugin.trigger = async (_event, _ctx, payload) => payload
 }
 
 const loadLLM = async () =>
@@ -120,7 +111,12 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  mock.restore()
+  Provider.getLanguage = originals.getLanguage
+  Provider.getProvider = originals.getProvider
+  Config.get = originals.configGet
+  Auth.get = originals.authGet
+  Plugin.trigger = originals.pluginTrigger
+  delete (globalThis as { __opencodeStreamClaudeNative?: unknown }).__opencodeStreamClaudeNative
 })
 
 describe("session.llm.nativeSession", () => {

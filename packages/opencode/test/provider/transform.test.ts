@@ -260,39 +260,13 @@ describe("ProviderTransform.maxOutputTokens", () => {
   describe("anthropic with thinking options", () => {
     test("returns 32k when budgetTokens + 32k <= modelLimit", () => {
       const model = createModel("@ai-sdk/anthropic", 100000)
-      const options = {
-        thinking: {
-          type: "enabled",
-          budgetTokens: 10000,
-        },
-      }
-      const result = ProviderTransform.maxOutputTokens(model, options)
-      // When thinking is enabled (10k), we add standard limit (32k) to it -> 42k total
-      expect(result).toBe(42000)
-    })
-
-    test("returns budgetTokens + standardLimit even if it exceeds modelLimit", () => {
-      const model = createModel("@ai-sdk/anthropic", 50000)
-      const options = {
-        thinking: {
-          type: "enabled",
-          budgetTokens: 30000,
-        },
-      }
-      const result = ProviderTransform.maxOutputTokens(model, options)
-      // Budget (30k) + Standard (32k) = 62k. We trust this over modelLimit (50k).
-      expect(result).toBe(62000)
+      const result = ProviderTransform.maxOutputTokens(model)
+      expect(result).toBe(OUTPUT_TOKEN_MAX)
     })
 
     test("returns 32k when thinking type is not enabled", () => {
       const model = createModel("@ai-sdk/anthropic", 100000)
-      const options = {
-        thinking: {
-          type: "disabled",
-          budgetTokens: 10000,
-        },
-      }
-      const result = ProviderTransform.maxOutputTokens(model, options)
+      const result = ProviderTransform.maxOutputTokens(model)
       expect(result).toBe(OUTPUT_TOKEN_MAX)
     })
   })

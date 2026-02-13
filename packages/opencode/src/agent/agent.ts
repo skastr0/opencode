@@ -32,7 +32,6 @@ export namespace Agent {
       topP: z.number().optional(),
       temperature: z.number().optional(),
       color: z.string().optional(),
-      thinking: Config.Thinking.optional(),
       permission: PermissionNext.Ruleset,
       model: z
         .object({
@@ -229,7 +228,6 @@ export namespace Agent {
       item.hidden = value.hidden ?? item.hidden
       item.name = value.name ?? item.name
       item.steps = value.steps ?? item.steps
-      item.thinking = value.thinking ?? item.thinking
       item.options = mergeDeep(item.options, value.options ?? {})
       item.permission = PermissionNext.merge(item.permission, PermissionNext.fromConfig(value.permission ?? {}))
     }

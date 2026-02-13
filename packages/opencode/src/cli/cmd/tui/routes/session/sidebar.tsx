@@ -49,15 +49,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     }).format(total)
   })
 
-  // Get current agent's thinking config
-  const agentThinking = createMemo(() => {
-    const lastMsg = messages().findLast((m) => m.role === "user" || m.role === "assistant")
-    if (!lastMsg) return undefined
-    const agentName = lastMsg.agent
-    const agent = sync.data.agent.find((a) => a.name === agentName)
-    return agent?.thinking
-  })
-
   const context = createMemo(() => {
     const last = messages().findLast((x) => x.role === "assistant" && x.tokens.output > 0) as AssistantMessage
     if (!last) return
@@ -195,19 +186,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                     })()}
                   </Match>
                 </Switch>
-              </box>
-            </Show>
-            <Show when={agentThinking()}>
-              <box>
-                <text fg={theme.text}>
-                  <b>Thinking</b>
-                </text>
-                <text fg={theme.textMuted}>
-                  {agentThinking()!.effort ?? "medium"} effort
-                  {agentThinking()!.budgetTokens
-                    ? ` (${Math.round(agentThinking()!.budgetTokens! / 1000)}k tokens)`
-                    : ""}
-                </text>
               </box>
             </Show>
             <Show when={mcpEntries().length > 0}>

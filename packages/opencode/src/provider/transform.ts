@@ -905,24 +905,8 @@ export namespace ProviderTransform {
     return { [key]: options }
   }
 
-  export function maxOutputTokens(model: Provider.Model, options?: Record<string, any>): number {
-    const modelCap = model.limit.output || OUTPUT_TOKEN_MAX
-    const standardLimit = Math.min(modelCap, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
-
-    if (model.api.npm === "@ai-sdk/anthropic" || model.api.npm === "@ai-sdk/google-vertex/anthropic") {
-      const thinking = options?.["thinking"]
-      const budgetTokens = typeof thinking?.["budgetTokens"] === "number" ? thinking["budgetTokens"] : 0
-      const enabled = thinking?.["type"] === "enabled"
-      if (enabled && budgetTokens > 0) {
-        // Return text tokens so that text + thinking <= model cap, preferring 32k text when possible.
-        if (budgetTokens + standardLimit <= modelCap) {
-          return standardLimit
-        }
-        return modelCap - budgetTokens
-      }
-    }
-
-    return standardLimit
+  export function maxOutputTokens(model: Provider.Model): number {
+    return Math.min(model.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
   }
 
   export function schema(model: Provider.Model, schema: JSONSchema.BaseSchema | JSONSchema7): JSONSchema7 {

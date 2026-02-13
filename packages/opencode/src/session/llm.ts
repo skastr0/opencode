@@ -23,7 +23,6 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
-import { ThinkingEffort } from "./thinking-effort"
 import type { ClaudeNativeStreamEvent } from "@/provider/native/claude-agent-sdk"
 import { streamClaudeNative } from "@/provider/native/claude-agent-sdk"
 import { ClaudeAgentSDKSessionStore } from "@/provider/native/session-store"
@@ -32,7 +31,7 @@ export namespace LLM {
   const log = Log.create({ service: "llm" })
   const claudeSessionStore = new ClaudeAgentSDKSessionStore()
 
-  export const OUTPUT_TOKEN_MAX = Flag.OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 32_000
+  export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 
   export type StreamInput = {
     user: MessageV2.User
@@ -109,33 +108,19 @@ export namespace LLM {
 
     const variant =
       !input.small && input.model.variants && input.user.variant ? input.model.variants[input.user.variant] : {}
-    const variantKey =
-      !input.small && input.model.variants && input.user.variant && input.model.variants[input.user.variant]
-        ? input.user.variant
-        : null
-
-    // Build thinking options from agent config (if present)
-    const thinkingLevel = ThinkingEffort.resolve(input.agent.thinking)
-
-    // Build provider-specific thinking options
-    const thinkingOptions = thinkingLevel ? buildThinkingOptions(input.model, thinkingLevel) : {}
-
-    // Build options in two stages to avoid TypeScript type depth limits
-    const baseOptions = {
-      ...ProviderTransform.options({
-        model: input.model,
-        sessionID: input.sessionID,
-        providerOptions: provider.options,
-      }),
-      ...(input.small ? ProviderTransform.smallOptions(input.model) : {}),
-      ...thinkingOptions,
-    }
-    const options: Record<string, any> = mergeOptions({
-      base: baseOptions,
-      model: input.model.options,
-      agent: input.agent.options,
-      variant,
-    })
+    const base = input.small
+      ? ProviderTransform.smallOptions(input.model)
+      : ProviderTransform.options({
+          model: input.model,
+          sessionID: input.sessionID,
+          providerOptions: provider.options,
+        })
+    const options: Record<string, any> = pipe(
+      base,
+      mergeDeep(input.model.options),
+      mergeDeep(input.agent.options),
+      mergeDeep(variant),
+    )
     if (isCodex) {
       options.instructions = SystemPrompt.instructions()
     }
@@ -155,7 +140,7 @@ export namespace LLM {
           : undefined,
         topP: input.agent.topP ?? ProviderTransform.topP(input.model),
         topK: ProviderTransform.topK(input.model),
-        options: sanitizeOptions(input.model, options),
+        options,
       },
     )
 
@@ -174,26 +159,7 @@ export namespace LLM {
     )
 
     const maxOutputTokens =
-      isCodex || provider.id.includes("github-copilot")
-        ? undefined
-        : ProviderTransform.maxOutputTokens(input.model, options)
-
-    const messages = [
-      ...(isCodex
-        ? ([
-            {
-              role: "user",
-              content: system.join("\n\n"),
-            } as ModelMessage,
-          ] as ModelMessage[])
-        : system.map(
-            (x): ModelMessage => ({
-              role: "system",
-              content: x,
-            }),
-          )),
-      ...input.messages,
-    ]
+      isCodex || provider.id.includes("github-copilot") ? undefined : ProviderTransform.maxOutputTokens(input.model)
 
     const tools = await resolveTools(input)
 
@@ -226,51 +192,12 @@ export namespace LLM {
       execute: async () => ({ output: "Provider executed", title: "Provider Tool", metadata: {} }),
     })
 
-    const toolKeys = Object.keys(tools)
-    const activeTools = toolKeys.filter((x) => x !== "invalid" && x !== "_noop" && x !== "_providerExecuted")
-    const requestLog = buildRequestLog({
-      providerID: input.model.providerID,
-      modelID: input.model.id,
-      sessionID: input.sessionID,
-      agent: input.agent.name,
-      variantKey,
-      maxOutputTokens,
-      thinking: thinkingLevel,
-      messageCount: input.messages.length,
-      systemCount: system.length,
-      toolCount: toolKeys.length,
-      activeToolCount: activeTools.length,
-    })
-    l.debug("stream request", requestLog)
-
     if (input.model.providerID === "claude-agent-sdk") {
       const sessionKey = input.sessionID
       const sdkSessionId = await claudeSessionStore.get(sessionKey, input.model.id)
       if (sdkSessionId) await claudeSessionStore.touch(sessionKey)
 
-      // When resuming an SDK session, only send the new user message + any per-request system overrides.
-      // The SDK session already has the full system prompt and history.
-      let promptMessages: ModelMessage[]
-      if (sdkSessionId) {
-        // Find the last user message (scan backwards to be safe)
-        const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")
-        // Include any per-request system overrides (from input.user.system or input.system)
-        const perRequestSystem = [...input.system, input.user.system].filter(Boolean).join("\n")
-        promptMessages = [
-          ...(perRequestSystem ? [{ role: "system", content: perRequestSystem } as ModelMessage] : []),
-          ...(lastUserMessage ? [lastUserMessage] : []),
-        ]
-        l.debug("resuming SDK session with minimal prompt", {
-          sdkSessionId,
-          hasPerRequestSystem: Boolean(perRequestSystem),
-          hasUserMessage: Boolean(lastUserMessage),
-        })
-      } else {
-        // First request in session: send full system prompt + history
-        promptMessages = messages
-      }
-
-      const prompt = ProviderTransform.message(promptMessages, input.model, options) as LanguageModelV2Prompt
+      const prompt = ProviderTransform.message(input.messages, input.model, options) as LanguageModelV2Prompt
 
       const nativeStream =
         (globalThis as { __opencodeStreamClaudeNative?: typeof streamClaudeNative }).__opencodeStreamClaudeNative ??
@@ -284,7 +211,7 @@ export namespace LLM {
         abort: input.abort,
         sdkSessionId,
         onSessionId: (id) => void claudeSessionStore.set(sessionKey, id, input.model.id),
-        maxThinkingTokens: thinkingLevel?.budgetTokens,
+        maxThinkingTokens: undefined,
       })
       let textPromise: Promise<string> | undefined
 
@@ -350,7 +277,7 @@ export namespace LLM {
       topP: params.topP,
       topK: params.topK,
       providerOptions: ProviderTransform.providerOptions(input.model, params.options),
-      activeTools,
+      activeTools: Object.keys(tools).filter((x) => x !== "invalid" && x !== "_providerExecuted"),
       tools,
       toolChoice: input.toolChoice,
       maxOutputTokens,
@@ -372,7 +299,15 @@ export namespace LLM {
         ...headers,
       },
       maxRetries: input.retries ?? 0,
-      messages,
+      messages: [
+        ...system.map(
+          (x): ModelMessage => ({
+            role: "system",
+            content: x,
+          }),
+        ),
+        ...input.messages,
+      ],
       model: wrapLanguageModel({
         model: language!,
         middleware: [
@@ -422,174 +357,4 @@ export namespace LLM {
     return false
   }
 
-  export type RequestLog = {
-    providerID: string
-    modelID: string
-    sessionID: string
-    agent: string
-    variant: {
-      key: string | null
-    }
-    maxOutputTokens?: number
-    thinking: {
-      effort: ThinkingEffort.Level["effort"] | null
-      budgetTokens: number | null
-    }
-    messages: {
-      total: number
-      system: number
-      history: number
-    }
-    tools: {
-      total: number
-      active: number
-    }
-  }
-
-  export function buildRequestLog(input: {
-    providerID: string
-    modelID: string
-    sessionID: string
-    agent: string
-    variantKey: string | null
-    maxOutputTokens?: number
-    thinking?: ThinkingEffort.Level
-    messageCount: number
-    systemCount: number
-    toolCount: number
-    activeToolCount: number
-  }): RequestLog {
-    return {
-      providerID: input.providerID,
-      modelID: input.modelID,
-      sessionID: input.sessionID,
-      agent: input.agent,
-      variant: {
-        key: input.variantKey,
-      },
-      maxOutputTokens: input.maxOutputTokens,
-      thinking: {
-        effort: input.thinking?.effort ?? null,
-        budgetTokens: input.thinking?.budgetTokens ?? null,
-      },
-      messages: {
-        total: input.messageCount + input.systemCount,
-        system: input.systemCount,
-        history: input.messageCount,
-      },
-      tools: {
-        total: input.toolCount,
-        active: input.activeToolCount,
-      },
-    }
-  }
-
-  export function mergeOptions(input: {
-    base: Record<string, unknown>
-    model?: Record<string, unknown>
-    agent?: Record<string, unknown>
-    variant?: Record<string, unknown>
-  }): Record<string, unknown> {
-    const model = input.model ?? {}
-    const agent = input.agent ?? {}
-    const variant = input.variant ?? {}
-    return pipe(input.base, mergeDeep(model), mergeDeep(agent), mergeDeep(variant))
-  }
-
-  function buildThinkingOptions(model: Provider.Model, level: ThinkingEffort.Level): Record<string, any> {
-    const npm = model.api.npm
-    const id = model.id.toLowerCase()
-
-    // Kimi K2.5 doesn't support agent thinking options
-    if (id.includes("kimi-k2.5")) return {}
-
-    // Provider-specific budget limits (from official API docs)
-    // Anthropic: 32,000 max (docs.anthropic.com/en/build-with-claude/extended-thinking)
-    // Google Flash: 24,576 max, Pro: 32,768 max (ai.google.dev/gemini-api/docs/thinking)
-    const ANTHROPIC_MAX = 32_000
-    const GOOGLE_FLASH_MAX = 24_576
-
-    // Anthropic: thinking.type + budgetTokens
-    // Note: effort requires beta header which proxied providers (like opencode) may not support
-    if (npm === "@ai-sdk/anthropic") {
-      const budget = Math.min(level.budgetTokens, ANTHROPIC_MAX)
-      return {
-        thinking: { type: "enabled" as const, budgetTokens: budget },
-      }
-    }
-
-    // Bedrock with Anthropic models: reasoningConfig
-    if (npm === "@ai-sdk/amazon-bedrock" && model.api.id.includes("anthropic")) {
-      const budget = Math.min(level.budgetTokens, ANTHROPIC_MAX)
-      return {
-        reasoningConfig: { type: "enabled" as const, budgetTokens: budget },
-      }
-    }
-
-    // OpenAI: reasoningEffort (budgetTokens not supported)
-    if (npm === "@ai-sdk/openai" || npm === "@ai-sdk/azure") {
-      return {
-        reasoningEffort: level.effort,
-      }
-    }
-
-    // GitHub Copilot: reasoningEffort with summary
-    if (npm === "@ai-sdk/github-copilot") {
-      return {
-        reasoningEffort: level.effort,
-        reasoningSummary: "auto",
-        include: ["reasoning.encrypted_content"],
-      }
-    }
-
-    // Google: thinkingConfig with budget or level
-    // Note: Google API treats "high" specially with thinkingLevel, while lower
-    // efforts use explicit token budgets via thinkingBudget
-    if (npm === "@ai-sdk/google" || npm === "@ai-sdk/google-vertex") {
-      // High effort uses thinkingLevel, others use budget
-      if (level.effort === "high") {
-        return {
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingLevel: "high",
-          },
-        }
-      }
-      const budget = Math.min(level.budgetTokens, GOOGLE_FLASH_MAX)
-      return {
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget: budget,
-        },
-      }
-    }
-
-    // OpenRouter: reasoning.effort
-    if (npm === "@openrouter/ai-sdk-provider") {
-      return {
-        reasoning: { effort: level.effort },
-      }
-    }
-
-    // Unknown provider - return empty (no thinking support)
-    return {}
-  }
-
-  /**
-   * Sanitize provider options to handle provider-specific quirks.
-   * For example, Gemini doesn't support both thinkingLevel and thinkingBudget together.
-   */
-  function sanitizeOptions(model: Provider.Model, options: Record<string, any>): Record<string, any> {
-    const npm = model.api.npm
-
-    // Google/Gemini: Cannot have both thinkingLevel and thinkingBudget
-    // Prefer thinkingLevel (effort setting) over thinkingBudget
-    if (npm === "@ai-sdk/google" || npm === "@ai-sdk/google-vertex") {
-      if (options.thinkingConfig?.thinkingLevel !== undefined && options.thinkingConfig?.thinkingBudget !== undefined) {
-        delete options.thinkingConfig.thinkingBudget
-      }
-    }
-
-    return options
-  }
 }
