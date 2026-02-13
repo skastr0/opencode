@@ -772,11 +772,8 @@ export namespace Provider {
       family: model.family,
       api: {
         id: model.id,
-        url: provider.api!,
-        npm: iife(() => {
-          if (provider.id.startsWith("github-copilot")) return "@ai-sdk/github-copilot"
-          return model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible"
-        }),
+        url: model.provider?.api ?? provider.api!,
+        npm: model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible",
       },
       status: model.status ?? "active",
       headers: model.headers ?? {},
