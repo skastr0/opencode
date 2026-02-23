@@ -11,6 +11,8 @@ import type { Provider } from "../../src/provider/provider"
 Log.init({ print: false })
 
 function createModel(opts: {
+  id?: string
+  providerID?: string
   context: number
   output: number
   input?: number
@@ -18,8 +20,8 @@ function createModel(opts: {
   npm?: string
 }): Provider.Model {
   return {
-    id: "test-model",
-    providerID: "test",
+    id: opts.id ?? "test-model",
+    providerID: opts.providerID ?? "test",
     name: "Test",
     limit: {
       context: opts.context,
@@ -96,6 +98,54 @@ describe("session.compaction.isOverflow", () => {
       fn: async () => {
         const model = createModel({ context: 400_000, input: 272_000, output: 128_000 })
         const tokens = { input: 200_000, output: 20_000, reasoning: 0, cache: { read: 10_000, write: 0 } }
+        expect(await SessionCompaction.isOverflow({ tokens, model })).toBe(false)
+      },
+    })
+  })
+
+  test("uses fallback token count for codex when total underreports", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const model = createModel({
+          id: "gpt-5.3-codex",
+          providerID: "openai",
+          context: 400_000,
+          input: 272_000,
+          output: 128_000,
+        })
+        const tokens = {
+          total: 180_000,
+          input: 221_000,
+          output: 30_000,
+          reasoning: 0,
+          cache: { read: 2_000, write: 0 },
+        }
+        expect(await SessionCompaction.isOverflow({ tokens, model })).toBe(true)
+      },
+    })
+  })
+
+  test("keeps legacy total behavior for non-codex models", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const model = createModel({
+          id: "gpt-4o",
+          providerID: "openai",
+          context: 400_000,
+          input: 272_000,
+          output: 128_000,
+        })
+        const tokens = {
+          total: 180_000,
+          input: 221_000,
+          output: 30_000,
+          reasoning: 0,
+          cache: { read: 2_000, write: 0 },
+        }
         expect(await SessionCompaction.isOverflow({ tokens, model })).toBe(false)
       },
     })
