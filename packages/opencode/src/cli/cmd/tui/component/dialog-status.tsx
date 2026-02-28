@@ -3,6 +3,7 @@ import { fileURLToPath } from "bun"
 import { useTheme } from "../context/theme"
 import { useDialog } from "@tui/ui/dialog"
 import { useSync } from "@tui/context/sync"
+import { useRoute } from "@tui/context/route"
 import { For, Match, Switch, Show, createMemo } from "solid-js"
 
 export type DialogStatusProps = {}
@@ -11,8 +12,25 @@ export function DialogStatus() {
   const sync = useSync()
   const { theme } = useTheme()
   const dialog = useDialog()
+  const route = useRoute()
 
   const enabledFormatters = createMemo(() => sync.data.formatter.filter((f) => f.enabled))
+
+  const transport = createMemo(() => {
+    if (route.data.type !== "session") return "unknown"
+    const sessionID = route.data.sessionID
+    const messages = sync.data.message[sessionID] ?? []
+    const last = messages.findLast((item) => item.role === "assistant")
+    if (!last) return "unknown"
+    const parts = sync.data.part[last.id] ?? []
+    const value = [...parts]
+      .reverse()
+      .map((part: any) => part?.metadata?.openai?.transport)
+      .find((item) => item === "websocket" || item === "http")
+    if (value === "websocket") return "ws"
+    if (value === "http") return "http"
+    return "unknown"
+  })
 
   const plugins = createMemo(() => {
     const list = sync.data.config.plugin ?? []
@@ -49,6 +67,7 @@ export function DialogStatus() {
           esc
         </text>
       </box>
+      <text fg={theme.textMuted}>responses transport: {transport()}</text>
       <Show when={Object.keys(sync.data.mcp).length > 0} fallback={<text fg={theme.text}>No MCP Servers</text>}>
         <box>
           <text fg={theme.text}>{Object.keys(sync.data.mcp).length} MCP Servers</text>

@@ -61,6 +61,19 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     }
   })
 
+  const transport = createMemo(() => {
+    const last = messages().findLast((x) => x.role === "assistant") as AssistantMessage | undefined
+    if (!last) return "unknown"
+    const parts = sync.data.part[last.id] ?? []
+    const value = [...parts]
+      .reverse()
+      .map((part: any) => part?.metadata?.openai?.transport)
+      .find((item) => item === "websocket" || item === "http")
+    if (value === "websocket") return "ws"
+    if (value === "http") return "http"
+    return "unknown"
+  })
+
   const directory = useDirectory()
   const kv = useKV()
 
@@ -146,6 +159,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
               </text>
               <text fg={theme.textMuted}>{context()?.tokens ?? 0} tokens</text>
               <text fg={theme.textMuted}>{context()?.percentage ?? 0}% used</text>
+              <text fg={theme.textMuted}>transport: {transport()}</text>
               <text fg={theme.textMuted}>{cost()} spent</text>
             </box>
             <Show when={quota() !== null}>
