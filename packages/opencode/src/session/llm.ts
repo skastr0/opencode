@@ -319,6 +319,38 @@ export namespace LLM {
               }
               return args.params
             },
+            async wrapStream({ doStream }) {
+              const result = await doStream()
+              const headers = result.response?.headers
+              const raw =
+                headers instanceof Headers
+                  ? headers.get("x-opencode-transport")
+                  : headers && typeof headers === "object"
+                    ? (headers as Record<string, string>)["x-opencode-transport"]
+                    : undefined
+              const transport = raw === "responses-websocket" ? "websocket" : raw === "responses-http" ? "http" : undefined
+              if (!transport) return result
+              return {
+                ...result,
+                stream: result.stream.pipeThrough(
+                  new TransformStream({
+                    transform(chunk: any, controller: any) {
+                      if (chunk.type === "text-start" || chunk.type === "finish") {
+                        controller.enqueue({
+                          ...chunk,
+                          providerMetadata: {
+                            ...chunk.providerMetadata,
+                            openai: { ...chunk.providerMetadata?.openai, transport },
+                          },
+                        })
+                      } else {
+                        controller.enqueue(chunk)
+                      }
+                    },
+                  }),
+                ),
+              }
+            },
           },
         ],
       }),

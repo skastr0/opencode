@@ -1003,6 +1003,32 @@ export namespace Config {
           baseURL: z.string().optional(),
           enterpriseUrl: z.string().optional().describe("GitHub Enterprise URL for copilot authentication"),
           setCacheKey: z.boolean().optional().describe("Enable promptCacheKey for this provider (default false)"),
+          websocketMode: z
+            .boolean()
+            .optional()
+            .describe("Enable Responses API WebSocket mode for this provider when available"),
+          compactionThreshold: z
+            .union([
+              z.number().int().min(1000).describe("Token threshold for Responses server-side compaction"),
+              z.literal(false).describe("Disable automatic Responses server-side compaction"),
+            ])
+            .optional(),
+          standaloneCompaction: z.boolean().optional().describe("Run /responses/compact before /responses requests"),
+          responsesSocketIdleTimeoutMs: z
+            .union([
+              z
+                .number()
+                .int()
+                .nonnegative()
+                .describe(
+                  "Idle timeout in milliseconds before closing an open Responses WebSocket. Default is 300000 (5 minutes). Set to false to disable idle eviction.",
+                ),
+              z.literal(false).describe("Disable Responses WebSocket idle eviction for this provider."),
+            ])
+            .optional()
+            .describe(
+              "Idle timeout in milliseconds before closing an open Responses WebSocket. Default is 300000 (5 minutes). Set to false to disable idle eviction.",
+            ),
           timeout: z
             .union([
               z

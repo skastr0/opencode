@@ -42,6 +42,7 @@ import { createTogetherAI } from "@ai-sdk/togetherai"
 import { createPerplexity } from "@ai-sdk/perplexity"
 import { createVercel } from "@ai-sdk/vercel"
 import { createGitLab, VERSION as GITLAB_PROVIDER_VERSION } from "@gitlab/gitlab-ai-provider"
+// WebSocket transport uses Bun's native WebSocket with custom headers
 import { fromNodeProviderChain } from "@aws-sdk/credential-providers"
 import { GoogleAuth } from "google-auth-library"
 import { ProviderTransform } from "./transform"
@@ -842,263 +843,301 @@ export namespace Provider {
     }
   }
 
-  const state = Instance.state(async () => {
-    using _ = log.time("state")
-    const config = await Config.get()
-    const modelsDev = await ModelsDev.get()
-    const database = mapValues(modelsDev, fromModelsDevProvider)
+  const state = Instance.state(
+    async () => {
+      using _ = log.time("state")
+      const config = await Config.get()
+      const modelsDev = await ModelsDev.get()
+      const database = mapValues(modelsDev, fromModelsDevProvider)
 
-    database["claude-agent-sdk"] = {
-      id: "claude-agent-sdk",
-      source: "custom",
-      name: "Claude Agent SDK",
-      env: [], // SDK handles its own auth (CLI login, OAuth, API key, etc.)
-      options: {},
-      models: CLAUDE_AGENT_SDK_MODELS,
-    }
-
-    const disabled = new Set(config.disabled_providers ?? [])
-    const enabled = config.enabled_providers ? new Set(config.enabled_providers) : null
-
-    function isProviderAllowed(providerID: ProviderID): boolean {
-      if (enabled && !enabled.has(providerID)) return false
-      if (disabled.has(providerID)) return false
-      return true
-    }
-
-    const providers: { [providerID: string]: Info } = {}
-    const languages = new Map<string, LanguageModelV2>()
-    const modelLoaders: {
-      [providerID: string]: CustomModelLoader
-    } = {}
-    const varsLoaders: {
-      [providerID: string]: CustomVarsLoader
-    } = {}
-    const sdk = new Map<string, SDK>()
-
-    log.info("init")
-
-    const configProviders = Object.entries(config.provider ?? {})
-
-    function mergeProvider(providerID: ProviderID, provider: Partial<Info>) {
-      const existing = providers[providerID]
-      if (existing) {
-        // @ts-expect-error
-        providers[providerID] = mergeDeep(existing, provider)
-        return
-      }
-      const match = database[providerID]
-      if (!match) return
-      // @ts-expect-error
-      providers[providerID] = mergeDeep(match, provider)
-    }
-
-    // extend database from config
-    for (const [providerID, provider] of configProviders) {
-      const existing = database[providerID]
-      const parsed: Info = {
-        id: ProviderID.make(providerID),
-        name: provider.name ?? existing?.name ?? providerID,
-        env: provider.env ?? existing?.env ?? [],
-        options: mergeDeep(existing?.options ?? {}, provider.options ?? {}),
-        source: "config",
-        models: existing?.models ?? {},
+      database["claude-agent-sdk"] = {
+        id: "claude-agent-sdk",
+        source: "custom",
+        name: "Claude Agent SDK",
+        env: [],
+        options: {},
+        models: CLAUDE_AGENT_SDK_MODELS,
       }
 
-      for (const [modelID, model] of Object.entries(provider.models ?? {})) {
-        const existingModel = parsed.models[model.id ?? modelID]
-        const name = iife(() => {
-          if (model.name) return model.name
-          if (model.id && model.id !== modelID) return modelID
-          return existingModel?.name ?? modelID
-        })
-        const parsedModel: Model = {
-          id: ModelID.make(modelID),
-          api: {
-            id: model.id ?? existingModel?.api.id ?? modelID,
-            npm:
-              model.provider?.npm ??
-              provider.npm ??
-              existingModel?.api.npm ??
-              modelsDev[providerID]?.npm ??
-              "@ai-sdk/openai-compatible",
-            url: model.provider?.api ?? provider?.api ?? existingModel?.api.url ?? modelsDev[providerID]?.api,
-          },
-          status: model.status ?? existingModel?.status ?? "active",
-          name,
-          providerID: ProviderID.make(providerID),
-          capabilities: {
-            temperature: model.temperature ?? existingModel?.capabilities.temperature ?? false,
-            reasoning: model.reasoning ?? existingModel?.capabilities.reasoning ?? false,
-            attachment: model.attachment ?? existingModel?.capabilities.attachment ?? false,
-            toolcall: model.tool_call ?? existingModel?.capabilities.toolcall ?? true,
-            input: {
-              text: model.modalities?.input?.includes("text") ?? existingModel?.capabilities.input.text ?? true,
-              audio: model.modalities?.input?.includes("audio") ?? existingModel?.capabilities.input.audio ?? false,
-              image: model.modalities?.input?.includes("image") ?? existingModel?.capabilities.input.image ?? false,
-              video: model.modalities?.input?.includes("video") ?? existingModel?.capabilities.input.video ?? false,
-              pdf: model.modalities?.input?.includes("pdf") ?? existingModel?.capabilities.input.pdf ?? false,
-            },
-            output: {
-              text: model.modalities?.output?.includes("text") ?? existingModel?.capabilities.output.text ?? true,
-              audio: model.modalities?.output?.includes("audio") ?? existingModel?.capabilities.output.audio ?? false,
-              image: model.modalities?.output?.includes("image") ?? existingModel?.capabilities.output.image ?? false,
-              video: model.modalities?.output?.includes("video") ?? existingModel?.capabilities.output.video ?? false,
-              pdf: model.modalities?.output?.includes("pdf") ?? existingModel?.capabilities.output.pdf ?? false,
-            },
-            interleaved: model.interleaved ?? false,
-          },
-          cost: {
-            input: model?.cost?.input ?? existingModel?.cost?.input ?? 0,
-            output: model?.cost?.output ?? existingModel?.cost?.output ?? 0,
-            cache: {
-              read: model?.cost?.cache_read ?? existingModel?.cost?.cache.read ?? 0,
-              write: model?.cost?.cache_write ?? existingModel?.cost?.cache.write ?? 0,
-            },
-          },
-          options: mergeDeep(existingModel?.options ?? {}, model.options ?? {}),
-          limit: {
-            context: model.limit?.context ?? existingModel?.limit?.context ?? 0,
-            output: model.limit?.output ?? existingModel?.limit?.output ?? 0,
-          },
-          headers: mergeDeep(existingModel?.headers ?? {}, model.headers ?? {}),
-          family: model.family ?? existingModel?.family ?? "",
-          release_date: model.release_date ?? existingModel?.release_date ?? "",
-          variants: {},
+      if (database["github-copilot"]) {
+        const copilot = database["github-copilot"]
+        database["github-copilot-enterprise"] = {
+          ...copilot,
+          id: ProviderID.make("github-copilot-enterprise"),
+          name: "GitHub Copilot Enterprise",
+          models: mapValues(copilot.models, (model) => ({
+            ...model,
+            providerID: ProviderID.make("github-copilot-enterprise"),
+          })),
         }
-        const merged = mergeDeep(ProviderTransform.variants(parsedModel), model.variants ?? {})
-        parsedModel.variants = mapValues(
-          pickBy(merged, (v) => !v.disabled),
-          (v) => omit(v, ["disabled"]),
-        )
-        parsed.models[modelID] = parsedModel
       }
-      database[providerID] = parsed
-    }
 
-    // load env
-    const env = Env.all()
-    for (const [id, provider] of Object.entries(database)) {
-      const providerID = ProviderID.make(id)
-      if (disabled.has(providerID)) continue
-      const apiKey = provider.env.map((item) => env[item]).find(Boolean)
-      if (!apiKey) continue
-      mergeProvider(providerID, {
-        source: "env",
-        key: provider.env.length === 1 ? apiKey : undefined,
-      })
-    }
+      const disabled = new Set(config.disabled_providers ?? [])
+      const enabled = config.enabled_providers ? new Set(config.enabled_providers) : null
 
-    // load apikeys
-    for (const [id, provider] of Object.entries(await Auth.all())) {
-      const providerID = ProviderID.make(id)
-      if (disabled.has(providerID)) continue
-      if (provider.type === "api") {
+      function isProviderAllowed(providerID: ProviderID): boolean {
+        if (enabled && !enabled.has(providerID)) return false
+        if (disabled.has(providerID)) return false
+        return true
+      }
+
+      const providers: { [providerID: string]: Info } = {}
+      const languages = new Map<string, LanguageModelV2>()
+      const modelLoaders: {
+        [providerID: string]: CustomModelLoader
+      } = {}
+      const varsLoaders: {
+        [providerID: string]: CustomVarsLoader
+      } = {}
+      const sdk = new Map<string, SDK>()
+
+      log.info("init")
+
+      const configProviders = Object.entries(config.provider ?? {})
+
+      function mergeProvider(providerID: ProviderID, provider: Partial<Info>) {
+        const existing = providers[providerID]
+        if (existing) {
+          // @ts-expect-error
+          providers[providerID] = mergeDeep(existing, provider)
+          return
+        }
+        const match = database[providerID]
+        if (!match) return
+        // @ts-expect-error
+        providers[providerID] = mergeDeep(match, provider)
+      }
+
+      for (const [providerID, provider] of configProviders) {
+        const existing = database[providerID]
+        const parsed: Info = {
+          id: ProviderID.make(providerID),
+          name: provider.name ?? existing?.name ?? providerID,
+          env: provider.env ?? existing?.env ?? [],
+          options: mergeDeep(existing?.options ?? {}, provider.options ?? {}),
+          source: "config",
+          models: existing?.models ?? {},
+        }
+
+        for (const [modelID, model] of Object.entries(provider.models ?? {})) {
+          const existingModel = parsed.models[model.id ?? modelID]
+          const name = iife(() => {
+            if (model.name) return model.name
+            if (model.id && model.id !== modelID) return modelID
+            return existingModel?.name ?? modelID
+          })
+          const parsedModel: Model = {
+            id: ModelID.make(modelID),
+            api: {
+              id: model.id ?? existingModel?.api.id ?? modelID,
+              npm:
+                model.provider?.npm ??
+                provider.npm ??
+                existingModel?.api.npm ??
+                modelsDev[providerID]?.npm ??
+                "@ai-sdk/openai-compatible",
+              url: model.provider?.api ?? provider?.api ?? existingModel?.api.url ?? modelsDev[providerID]?.api,
+            },
+            status: model.status ?? existingModel?.status ?? "active",
+            name,
+            providerID: ProviderID.make(providerID),
+            capabilities: {
+              temperature: model.temperature ?? existingModel?.capabilities.temperature ?? false,
+              reasoning: model.reasoning ?? existingModel?.capabilities.reasoning ?? false,
+              attachment: model.attachment ?? existingModel?.capabilities.attachment ?? false,
+              toolcall: model.tool_call ?? existingModel?.capabilities.toolcall ?? true,
+              input: {
+                text: model.modalities?.input?.includes("text") ?? existingModel?.capabilities.input.text ?? true,
+                audio: model.modalities?.input?.includes("audio") ?? existingModel?.capabilities.input.audio ?? false,
+                image: model.modalities?.input?.includes("image") ?? existingModel?.capabilities.input.image ?? false,
+                video: model.modalities?.input?.includes("video") ?? existingModel?.capabilities.input.video ?? false,
+                pdf: model.modalities?.input?.includes("pdf") ?? existingModel?.capabilities.input.pdf ?? false,
+              },
+              output: {
+                text: model.modalities?.output?.includes("text") ?? existingModel?.capabilities.output.text ?? true,
+                audio: model.modalities?.output?.includes("audio") ?? existingModel?.capabilities.output.audio ?? false,
+                image: model.modalities?.output?.includes("image") ?? existingModel?.capabilities.output.image ?? false,
+                video: model.modalities?.output?.includes("video") ?? existingModel?.capabilities.output.video ?? false,
+                pdf: model.modalities?.output?.includes("pdf") ?? existingModel?.capabilities.output.pdf ?? false,
+              },
+              interleaved: model.interleaved ?? false,
+            },
+            cost: {
+              input: model?.cost?.input ?? existingModel?.cost?.input ?? 0,
+              output: model?.cost?.output ?? existingModel?.cost?.output ?? 0,
+              cache: {
+                read: model?.cost?.cache_read ?? existingModel?.cost?.cache.read ?? 0,
+                write: model?.cost?.cache_write ?? existingModel?.cost?.cache.write ?? 0,
+              },
+            },
+            options: mergeDeep(existingModel?.options ?? {}, model.options ?? {}),
+            limit: {
+              context: model.limit?.context ?? existingModel?.limit?.context ?? 0,
+              output: model.limit?.output ?? existingModel?.limit?.output ?? 0,
+            },
+            headers: mergeDeep(existingModel?.headers ?? {}, model.headers ?? {}),
+            family: model.family ?? existingModel?.family ?? "",
+            release_date: model.release_date ?? existingModel?.release_date ?? "",
+            variants: {},
+          }
+          const merged = mergeDeep(ProviderTransform.variants(parsedModel), model.variants ?? {})
+          parsedModel.variants = mapValues(
+            pickBy(merged, (v) => !v.disabled),
+            (v) => omit(v, ["disabled"]),
+          )
+          parsed.models[modelID] = parsedModel
+        }
+        database[providerID] = parsed
+      }
+
+      const env = Env.all()
+      for (const [id, provider] of Object.entries(database)) {
+        const providerID = ProviderID.make(id)
+        if (disabled.has(providerID)) continue
+        const apiKey = provider.env.map((item) => env[item]).find(Boolean)
+        if (!apiKey) continue
+        mergeProvider(providerID, {
+          source: "env",
+          key: provider.env.length === 1 ? apiKey : undefined,
+        })
+      }
+
+      for (const [id, provider] of Object.entries(await Auth.all())) {
+        const providerID = ProviderID.make(id)
+        if (disabled.has(providerID)) continue
+        if (provider.type !== "api") continue
         mergeProvider(providerID, {
           source: "api",
           key: provider.key,
         })
       }
-    }
 
-    for (const plugin of await Plugin.list()) {
-      if (!plugin.auth) continue
-      const providerID = ProviderID.make(plugin.auth.provider)
-      if (disabled.has(providerID)) continue
+      for (const plugin of await Plugin.list()) {
+        if (!plugin.auth?.loader) continue
+        const providerID = ProviderID.make(plugin.auth.provider)
+        if (disabled.has(providerID)) continue
 
-      const auth = await Auth.get(providerID)
-      if (!auth) continue
-      if (!plugin.auth.loader) continue
+        let hasAuth = false
+        const auth = await Auth.get(providerID)
+        if (auth) hasAuth = true
 
-      if (auth) {
-        const options = await plugin.auth.loader(() => Auth.get(providerID) as any, database[plugin.auth.provider])
-        const opts = options ?? {}
-        const patch: Partial<Info> = providers[providerID] ? { options: opts } : { source: "custom", options: opts }
-        mergeProvider(providerID, patch)
-      }
-    }
+        if (providerID === ProviderID.make("github-copilot") && !hasAuth) {
+          const enterpriseAuth = await Auth.get(ProviderID.make("github-copilot-enterprise"))
+          if (enterpriseAuth) hasAuth = true
+        }
 
-    for (const [id, fn] of Object.entries(CUSTOM_LOADERS)) {
-      const providerID = ProviderID.make(id)
-      if (disabled.has(providerID)) continue
-      const data = database[providerID]
-      if (!data) {
-        log.error("Provider does not exist in model list " + providerID)
-        continue
-      }
-      const result = await fn(data)
-      if (result && (result.autoload || providers[providerID])) {
-        if (result.getModel) modelLoaders[providerID] = result.getModel
-        if (result.vars) varsLoaders[providerID] = result.vars
-        const opts = result.options ?? {}
-        const patch: Partial<Info> = providers[providerID] ? { options: opts } : { source: "custom", options: opts }
-        mergeProvider(providerID, patch)
-      }
-    }
+        if (!hasAuth) continue
 
-    // load config
-    for (const [id, provider] of configProviders) {
-      const providerID = ProviderID.make(id)
-      const partial: Partial<Info> = { source: "config" }
-      if (provider.env) partial.env = provider.env
-      if (provider.name) partial.name = provider.name
-      if (provider.options) partial.options = provider.options
-      mergeProvider(providerID, partial)
-    }
+        if (auth) {
+          const options = await plugin.auth.loader(() => Auth.get(providerID) as any, database[plugin.auth.provider])
+          const opts = options ?? {}
+          const patch: Partial<Info> = providers[providerID] ? { options: opts } : { source: "custom", options: opts }
+          mergeProvider(providerID, patch)
+        }
 
-    for (const [id, provider] of Object.entries(providers)) {
-      const providerID = ProviderID.make(id)
-      if (!isProviderAllowed(providerID)) {
-        delete providers[providerID]
-        continue
-      }
-
-      const configProvider = config.provider?.[providerID]
-
-      for (const [modelID, model] of Object.entries(provider.models)) {
-        model.api.id = model.api.id ?? model.id ?? modelID
-        if (
-          modelID === "gpt-5-chat-latest" ||
-          (providerID === ProviderID.openrouter && modelID === "openai/gpt-5-chat")
-        )
-          delete provider.models[modelID]
-        if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) delete provider.models[modelID]
-        if (model.status === "deprecated") delete provider.models[modelID]
-        if (
-          (configProvider?.blacklist && configProvider.blacklist.includes(modelID)) ||
-          (configProvider?.whitelist && !configProvider.whitelist.includes(modelID))
-        )
-          delete provider.models[modelID]
-
-        model.variants = mapValues(ProviderTransform.variants(model), (v) => v)
-
-        // Filter out disabled variants from config
-        const configVariants = configProvider?.models?.[modelID]?.variants
-        if (configVariants && model.variants) {
-          const merged = mergeDeep(model.variants, configVariants)
-          model.variants = mapValues(
-            pickBy(merged, (v) => !v.disabled),
-            (v) => omit(v, ["disabled"]),
+        if (providerID === ProviderID.make("github-copilot")) {
+          const enterpriseProviderID = ProviderID.make("github-copilot-enterprise")
+          if (disabled.has(enterpriseProviderID)) continue
+          const enterpriseAuth = await Auth.get(enterpriseProviderID)
+          if (!enterpriseAuth) continue
+          const enterpriseOptions = await plugin.auth.loader(
+            () => Auth.get(enterpriseProviderID) as any,
+            database[enterpriseProviderID],
           )
+          const opts = enterpriseOptions ?? {}
+          const patch: Partial<Info> = providers[enterpriseProviderID]
+            ? { options: opts }
+            : { source: "custom", options: opts }
+          mergeProvider(enterpriseProviderID, patch)
         }
       }
 
-      if (Object.keys(provider.models).length === 0) {
-        delete providers[providerID]
-        continue
+      for (const [id, fn] of Object.entries(CUSTOM_LOADERS)) {
+        const providerID = ProviderID.make(id)
+        if (disabled.has(providerID)) continue
+        const data = database[providerID]
+        if (!data) {
+          log.error("Provider does not exist in model list " + providerID)
+          continue
+        }
+        const result = await fn(data)
+        if (result && (result.autoload || providers[providerID])) {
+          if (result.getModel) modelLoaders[providerID] = result.getModel
+          if (result.vars) varsLoaders[providerID] = result.vars
+          const opts = result.options ?? {}
+          const patch: Partial<Info> = providers[providerID] ? { options: opts } : { source: "custom", options: opts }
+          mergeProvider(providerID, patch)
+        }
       }
 
-      log.info("found", { providerID })
-    }
+      for (const [id, provider] of configProviders) {
+        const providerID = ProviderID.make(id)
+        const partial: Partial<Info> = { source: "config" }
+        if (provider.env) partial.env = provider.env
+        if (provider.name) partial.name = provider.name
+        if (provider.options) partial.options = provider.options
+        mergeProvider(providerID, partial)
+      }
 
-    return {
-      models: languages,
-      providers,
-      sdk,
-      modelLoaders,
-      varsLoaders,
-    }
-  })
+      for (const [id, provider] of Object.entries(providers)) {
+        const providerID = ProviderID.make(id)
+        if (!isProviderAllowed(providerID)) {
+          delete providers[providerID]
+          continue
+        }
+
+        const configProvider = config.provider?.[providerID]
+
+        for (const [modelID, model] of Object.entries(provider.models)) {
+          model.api.id = model.api.id ?? model.id ?? modelID
+          if (
+            modelID === "gpt-5-chat-latest" ||
+            (providerID === ProviderID.openrouter && modelID === "openai/gpt-5-chat")
+          )
+            delete provider.models[modelID]
+          if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) delete provider.models[modelID]
+          if (model.status === "deprecated") delete provider.models[modelID]
+          if (
+            (configProvider?.blacklist && configProvider.blacklist.includes(modelID)) ||
+            (configProvider?.whitelist && !configProvider.whitelist.includes(modelID))
+          )
+            delete provider.models[modelID]
+
+          model.variants = mapValues(ProviderTransform.variants(model), (v) => v)
+          const configVariants = configProvider?.models?.[modelID]?.variants
+          if (configVariants && model.variants) {
+            const merged = mergeDeep(model.variants, configVariants)
+            model.variants = mapValues(
+              pickBy(merged, (v) => !v.disabled),
+              (v) => omit(v, ["disabled"]),
+            )
+          }
+        }
+
+        if (Object.keys(provider.models).length === 0) {
+          delete providers[providerID]
+          continue
+        }
+
+        log.info("found", { providerID })
+      }
+
+      return {
+        models: languages,
+        providers,
+        sdk,
+        cleanup: new Map<string, () => void>(),
+        modelLoaders,
+        varsLoaders,
+      }
+    },
+    async (state) => {
+      for (const close of state.cleanup.values()) close()
+      state.cleanup.clear()
+      state.sdk.clear()
+      state.models.clear()
+    },
+  )
 
   export async function list() {
     return state().then((state) => state.providers)
@@ -1176,44 +1215,573 @@ export namespace Provider {
       const chunkTimeout = options["chunkTimeout"] || DEFAULT_CHUNK_TIMEOUT
       delete options["chunkTimeout"]
 
+      type ResponsesSocketState = {
+        socket?: WebSocket
+        key?: string
+        busy: boolean
+        idleTimer?: ReturnType<typeof setTimeout>
+      }
+
+      const responsesSockets = new Map<string, ResponsesSocketState>()
+      let responsesSocketRetryAfter = 0
+      const responsesSocketRetryDelay = 30_000
+
+      const getResponsesSocketState = (session: string) => {
+        const match = responsesSockets.get(session)
+        if (match) return match
+        const state: ResponsesSocketState = { busy: false }
+        responsesSockets.set(session, state)
+        return state
+      }
+
+      const cleanupResponsesSocketState = (session: string) => {
+        const match = responsesSockets.get(session)
+        if (!match) return
+        if (match.busy) return
+        if (match.socket) return
+        if (match.idleTimer) return
+        responsesSockets.delete(session)
+      }
+
+      const clearResponsesSocketIdleTimer = (session: string) => {
+        const match = responsesSockets.get(session)
+        if (!match?.idleTimer) return
+        clearTimeout(match.idleTimer)
+        match.idleTimer = undefined
+      }
+
+      const closeResponsesWebSocket = (session: string, preserveBusy = false, reason = "stale") => {
+        const match = responsesSockets.get(session)
+        if (!match) return
+        clearResponsesSocketIdleTimer(session)
+        if (
+          match.socket &&
+          (match.socket.readyState === WebSocket.OPEN || match.socket.readyState === WebSocket.CONNECTING)
+        ) {
+          log.debug("closing responses websocket", {
+            providerID: model.providerID,
+            modelID: model.id,
+            session,
+            preserveBusy,
+            reason,
+          })
+          match.socket.close(1000, reason)
+        }
+        match.socket = undefined
+        match.key = undefined
+        if (!preserveBusy) {
+          match.busy = false
+          cleanupResponsesSocketState(session)
+        }
+      }
+
+      const getWebSocketHeaders = (headers: BunFetchRequestInit["headers"]) => {
+        const resolved = Object.fromEntries(new Headers(headers).entries())
+        // Required by OpenAI WebSocket mode
+        resolved["openai-beta"] = "responses_websockets=2026-02-06"
+        return resolved
+      }
+
+      const getWebSocketKey = (url: string, headers: Record<string, string>) => {
+        return JSON.stringify({
+          url,
+          authorization: headers["authorization"],
+          accountId: headers["chatgpt-account-id"],
+        })
+      }
+
+      const getResponsesSocketSession = (body: Record<string, any>) => {
+        const key = body["prompt_cache_key"] ?? body["promptCacheKey"]
+        if (typeof key === "string" && key.trim()) return key
+        return "__default__"
+      }
+
+      const closeAllResponsesWebSockets = () => {
+        const sessions = [...responsesSockets.keys()]
+        if (sessions.length === 0) return
+        log.info("closing all responses websockets", {
+          providerID: model.providerID,
+          modelID: model.id,
+          count: sessions.length,
+        })
+        for (const session of sessions) {
+          closeResponsesWebSocket(session, false, "provider-dispose")
+        }
+      }
+
+      const scheduleResponsesWebSocketIdleClose = (session: string, timeout: number | undefined) => {
+        if (timeout === undefined) return
+        const match = responsesSockets.get(session)
+        if (!match) return
+        if (match.busy) return
+        if (!match.socket) {
+          cleanupResponsesSocketState(session)
+          return
+        }
+        clearResponsesSocketIdleTimer(session)
+        log.debug("scheduled responses websocket idle close", {
+          providerID: model.providerID,
+          modelID: model.id,
+          session,
+          timeout,
+        })
+        match.idleTimer = setTimeout(() => {
+          const next = responsesSockets.get(session)
+          if (!next) return
+          if (next.busy) return
+          if (!next.socket) {
+            cleanupResponsesSocketState(session)
+            return
+          }
+          log.debug("evicting idle responses websocket", {
+            providerID: model.providerID,
+            modelID: model.id,
+            session,
+            timeout,
+          })
+          closeResponsesWebSocket(session, false, "idle-timeout")
+        }, timeout)
+      }
+
+      const openResponsesWebSocket = async (
+        session: string,
+        url: string,
+        headers: Record<string, string>,
+        signal?: AbortSignal,
+      ): Promise<WebSocket> => {
+        const state = getResponsesSocketState(session)
+        const key = getWebSocketKey(url, headers)
+
+        if (state.socket && state.socket.readyState === WebSocket.OPEN && state.key === key) {
+          log.debug("reusing responses websocket", {
+            providerID: model.providerID,
+            modelID: model.id,
+            session,
+          })
+          clearResponsesSocketIdleTimer(session)
+          return state.socket
+        }
+
+        if (
+          state.socket &&
+          (state.socket.readyState === WebSocket.OPEN || state.socket.readyState === WebSocket.CONNECTING)
+        ) {
+          closeResponsesWebSocket(session, true, "stale")
+        }
+
+        log.info("opening responses websocket", {
+          providerID: model.providerID,
+          modelID: model.id,
+          url,
+          hasAuth: !!headers["authorization"],
+        })
+
+        const ws = await new Promise<WebSocket>((resolve, reject) => {
+          const socket = new WebSocket(url, { headers } as any)
+          let timer: ReturnType<typeof setTimeout> | undefined
+
+          const cleanup = () => {
+            socket.removeEventListener("open", onOpen)
+            socket.removeEventListener("error", onError)
+            socket.removeEventListener("close", onClose)
+            signal?.removeEventListener("abort", onAbort)
+            if (timer) clearTimeout(timer)
+          }
+
+          const fail = (reason: string) => {
+            cleanup()
+            try {
+              if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close()
+            } catch {
+              // Ignore close errors
+            }
+            log.error("websocket connection failed", {
+              providerID: model.providerID,
+              modelID: model.id,
+              reason,
+            })
+            reject(new Error(reason))
+          }
+
+          const onOpen = () => {
+            cleanup()
+            log.info("websocket connection established", {
+              providerID: model.providerID,
+              modelID: model.id,
+            })
+            resolve(socket)
+          }
+
+          const onError = () => fail("websocket connection error")
+          const onClose = (event: Event) => {
+            const close = event as CloseEvent
+            fail(`websocket closed before open${close.code ? ` (code=${close.code}, reason=${close.reason})` : ""}`)
+          }
+
+          const onAbort = () => fail("websocket aborted")
+
+          socket.addEventListener("open", onOpen)
+          socket.addEventListener("error", onError)
+          socket.addEventListener("close", onClose)
+
+          if (signal?.aborted) {
+            onAbort()
+            return
+          }
+          signal?.addEventListener("abort", onAbort, { once: true })
+
+          timer = setTimeout(() => fail("websocket connection timeout (3s)"), 3000)
+        })
+
+        ws.addEventListener("close", (event: Event) => {
+          const close = event as CloseEvent
+          log.debug("responses websocket closed", {
+            providerID: model.providerID,
+            modelID: model.id,
+            session,
+            code: close.code,
+            reason: close.reason,
+          })
+          const match = responsesSockets.get(session)
+          if (!match || match.socket !== ws) return
+          clearResponsesSocketIdleTimer(session)
+          match.socket = undefined
+          match.key = undefined
+          match.busy = false
+          cleanupResponsesSocketState(session)
+        })
+
+        state.socket = ws
+        state.key = key
+        return ws
+      }
+
       options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
-        // Preserve custom fetch if it exists, wrap it with timeout logic
         const fetchFn = customFetch ?? fetch
         const opts = init ?? {}
         const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
         const signals: AbortSignal[] = []
+        const requestUrl =
+          input instanceof URL ? input : new URL(typeof input === "string" ? input : (input as Request).url)
+
+        const isOpenAIRequest = model.api.npm === "@ai-sdk/openai" && opts.body && opts.method === "POST"
+        const isOpenAIResponsesRequest = isOpenAIRequest && requestUrl.pathname.endsWith("/responses")
+        const defaultCompactionThreshold: number | undefined = undefined
+        const defaultResponsesSocketIdleTimeout = 5 * 60 * 1000
+        const websocketMode =
+          options["websocketMode"] === undefined ? model.providerID === "openai" : options["websocketMode"] !== false
+        const standaloneCompaction = options["standaloneCompaction"] === true
+        const compactionThreshold =
+          options["compactionThreshold"] === false
+            ? undefined
+            : typeof options["compactionThreshold"] === "number"
+              ? options["compactionThreshold"]
+              : defaultCompactionThreshold
+        const responsesSocketIdleTimeout =
+          options["responsesSocketIdleTimeoutMs"] === false
+            ? undefined
+            : typeof options["responsesSocketIdleTimeoutMs"] === "number"
+              ? Math.max(0, Math.floor(options["responsesSocketIdleTimeoutMs"]))
+              : defaultResponsesSocketIdleTimeout
+
+        let parsedBody: Record<string, any> | undefined
+        if (isOpenAIRequest && typeof opts.body === "string") {
+          try {
+            parsedBody = JSON.parse(opts.body)
+          } catch {
+            // Ignore non-JSON body
+          }
+        }
 
         if (opts.signal) signals.push(opts.signal)
         if (chunkAbortCtl) signals.push(chunkAbortCtl.signal)
-        if (options["timeout"] !== undefined && options["timeout"] !== null && options["timeout"] !== false)
+        if (options["timeout"] !== undefined && options["timeout"] !== null && options["timeout"] !== false) {
           signals.push(AbortSignal.timeout(options["timeout"]))
+        }
 
         const combined = signals.length === 0 ? null : signals.length === 1 ? signals[0] : AbortSignal.any(signals)
         if (combined) opts.signal = combined
 
-        // Strip openai itemId metadata following what codex does
-        // Codex uses #[serde(skip_serializing)] on id fields for all item types:
-        // Message, Reasoning, FunctionCall, LocalShellCall, CustomToolCall, WebSearchCall
-        // IDs are only re-attached for Azure with store=true
-        if (model.api.npm === "@ai-sdk/openai" && opts.body && opts.method === "POST") {
-          const body = JSON.parse(opts.body as string)
+        if (isOpenAIRequest && parsedBody) {
+          const body = parsedBody
           const isAzure = model.providerID.includes("azure")
           const keepIds = isAzure && body.store === true
           if (!keepIds && Array.isArray(body.input)) {
             for (const item of body.input) {
-              if ("id" in item) {
-                delete item.id
-              }
+              if ("id" in item) delete item.id
             }
-            opts.body = JSON.stringify(body)
+          }
+
+          if (
+            isOpenAIResponsesRequest &&
+            compactionThreshold !== undefined &&
+            Number.isFinite(compactionThreshold) &&
+            body.context_management == null
+          ) {
+            body.context_management = [
+              {
+                type: "compaction",
+                compact_threshold: Math.max(1000, Math.floor(compactionThreshold)),
+              },
+            ]
+          }
+
+          if (isOpenAIResponsesRequest && standaloneCompaction && Array.isArray(body.input) && body.input.length > 0) {
+            const compactUrl = new URL(requestUrl.toString())
+            compactUrl.pathname = compactUrl.pathname.replace(/\/responses$/, "/responses/compact")
+
+            try {
+              const compactHeaders = new Headers(opts.headers)
+              compactHeaders.set("content-type", "application/json")
+              const compactResult = await fetchFn(compactUrl, {
+                method: "POST",
+                headers: compactHeaders,
+                body: JSON.stringify({ model: body.model, input: body.input }),
+                signal: opts.signal,
+                // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
+                timeout: false,
+              })
+
+              if (compactResult.ok) {
+                const compactJson = await compactResult.json().catch(() => undefined)
+                if (compactJson && typeof compactJson === "object" && Array.isArray((compactJson as any).output)) {
+                  body.input = (compactJson as any).output
+                }
+              }
+            } catch (error) {
+              log.warn("standalone compaction failed", {
+                providerID: model.providerID,
+                modelID: model.id,
+                error,
+              })
+            }
+          }
+
+          opts.body = JSON.stringify(body)
+          parsedBody = body
+        }
+
+        const responsesSocketSession =
+          isOpenAIResponsesRequest && parsedBody ? getResponsesSocketSession(parsedBody) : undefined
+        const responsesSocketState = responsesSocketSession ? getResponsesSocketState(responsesSocketSession) : undefined
+        const responsesSocketReady = Date.now() >= responsesSocketRetryAfter
+
+        if (
+          isOpenAIResponsesRequest &&
+          websocketMode &&
+          parsedBody &&
+          parsedBody.stream === true &&
+          responsesSocketSession &&
+          responsesSocketState &&
+          !responsesSocketState.busy &&
+          responsesSocketReady
+        ) {
+          const wsHeaders = getWebSocketHeaders(opts.headers)
+          let wsUrl: URL
+
+          if (customFetch) {
+            const auth = await Auth.get(model.providerID)
+            if (auth?.type === "oauth" && auth.access) {
+              wsHeaders["authorization"] = `Bearer ${auth.access}`
+              const authWithAccount = auth as typeof auth & { accountId?: string }
+              if (authWithAccount.accountId) {
+                wsHeaders["chatgpt-account-id"] = authWithAccount.accountId
+              }
+              wsUrl = new URL("wss://chatgpt.com/backend-api/codex/responses")
+            } else {
+              wsUrl = new URL(requestUrl.toString())
+              wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:"
+            }
+          } else {
+            wsUrl = new URL(requestUrl.toString())
+            wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:"
+          }
+
+          responsesSocketState.busy = true
+          let socket: WebSocket | undefined
+          try {
+            socket = await openResponsesWebSocket(
+              responsesSocketSession,
+              wsUrl.toString(),
+              wsHeaders,
+              opts.signal ?? undefined,
+            )
+          } catch (error) {
+            responsesSocketState.busy = false
+            closeResponsesWebSocket(responsesSocketSession, false, "open-failed")
+            if (opts.signal?.aborted) throw error
+            responsesSocketRetryAfter = Date.now() + responsesSocketRetryDelay
+            log.warn("responses websocket unavailable, falling back to http", {
+              providerID: model.providerID,
+              modelID: model.id,
+              session: responsesSocketSession,
+              retryAfter: responsesSocketRetryAfter,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+
+          if (socket) {
+            const payload = { ...parsedBody, type: "response.create" }
+            delete (payload as any).stream
+            delete (payload as any).background
+
+            const encoder = new TextEncoder()
+            const stream = new ReadableStream<Uint8Array>({
+              start(controller) {
+                let done = false
+
+                const releaseSocket = () => {
+                  const state = responsesSockets.get(responsesSocketSession)
+                  if (!state) return
+                  state.busy = false
+                  scheduleResponsesWebSocketIdleClose(responsesSocketSession, responsesSocketIdleTimeout)
+                }
+
+                const cleanup = () => {
+                  socket.removeEventListener("message", onMessage)
+                  socket.removeEventListener("close", onClose)
+                  socket.removeEventListener("error", onError)
+                  opts.signal?.removeEventListener("abort", onAbort)
+                }
+
+                const enqueueEvent = (value: unknown) => {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}
+
+`))
+                }
+
+                const finish = (error?: string) => {
+                  if (done) return
+                  done = true
+                  cleanup()
+                  releaseSocket()
+
+                  if (error) {
+                    enqueueEvent({
+                      type: "error",
+                      error: {
+                        type: "invalid_request_error",
+                        code: "websocket_transport_error",
+                        message: error,
+                      },
+                      status: 500,
+                    })
+                    closeResponsesWebSocket(responsesSocketSession, false, "stream-error")
+                  }
+
+                  controller.enqueue(encoder.encode("data: [DONE]
+
+"))
+                  controller.close()
+                }
+
+                const parseMessage = (data: unknown) => {
+                  if (typeof data === "string") {
+                    try {
+                      return JSON.parse(data)
+                    } catch {
+                      return {
+                        type: "error",
+                        error: {
+                          type: "invalid_request_error",
+                          code: "websocket_invalid_json",
+                          message: data,
+                        },
+                        status: 500,
+                      }
+                    }
+                  }
+
+                  if (data instanceof ArrayBuffer) {
+                    const text = Buffer.from(new Uint8Array(data)).toString("utf8")
+                    try {
+                      return JSON.parse(text)
+                    } catch {
+                      return {
+                        type: "error",
+                        error: {
+                          type: "invalid_request_error",
+                          code: "websocket_invalid_json",
+                          message: text,
+                        },
+                        status: 500,
+                      }
+                    }
+                  }
+
+                  return data
+                }
+
+                const onMessage = (event: Event) => {
+                  const msg = parseMessage((event as MessageEvent).data)
+                  enqueueEvent(msg)
+                  const type = (msg as any)?.type
+                  if (type === "response.completed" || type === "response.incomplete" || type === "error") {
+                    finish()
+                  }
+                }
+
+                const onClose = (event: Event) => {
+                  const close = event as CloseEvent
+                  if (!done) finish(`websocket closed${close.code ? ` (${close.code})` : ""}`)
+                }
+                const onError = () => {
+                  if (!done) finish("websocket stream error")
+                }
+                const onAbort = () => {
+                  if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+                    socket.close(1000, "request aborted")
+                  }
+                  finish("request aborted")
+                }
+
+                socket.addEventListener("message", onMessage)
+                socket.addEventListener("close", onClose)
+                socket.addEventListener("error", onError)
+                opts.signal?.addEventListener("abort", onAbort, { once: true })
+
+                try {
+                  socket.send(JSON.stringify(payload))
+                } catch (error) {
+                  finish(error instanceof Error ? error.message : String(error))
+                }
+              },
+              cancel() {
+                const state = responsesSockets.get(responsesSocketSession)
+                if (!state) return
+                state.busy = false
+                scheduleResponsesWebSocketIdleClose(responsesSocketSession, responsesSocketIdleTimeout)
+              },
+            })
+
+            return new Response(stream, {
+              status: 200,
+              headers: {
+                "content-type": "text/event-stream",
+                "x-opencode-transport": "responses-websocket",
+              },
+            })
           }
         }
 
-        const res = await fetchFn(input, {
+        const response = await fetchFn(input, {
           ...opts,
           // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
           timeout: false,
         })
+
+        const res =
+          isOpenAIResponsesRequest && parsedBody?.stream === true && !response.headers.get("x-opencode-transport")
+            ? new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: (() => {
+                  const headers = new Headers(response.headers)
+                  headers.set("x-opencode-transport", "responses-http")
+                  return headers
+                })(),
+              })
+            : response
 
         if (!chunkAbortCtl) return res
         return wrapSSE(res, chunkTimeout, chunkAbortCtl)
@@ -1227,6 +1795,7 @@ export namespace Provider {
           ...options,
         })
         s.sdk.set(key, loaded)
+        s.cleanup.set(key, closeAllResponsesWebSockets)
         return loaded as SDK
       }
 
@@ -1246,6 +1815,7 @@ export namespace Provider {
         ...options,
       })
       s.sdk.set(key, loaded)
+      s.cleanup.set(key, closeAllResponsesWebSockets)
       return loaded as SDK
     } catch (e) {
       throw new InitError({ providerID: model.providerID }, { cause: e })

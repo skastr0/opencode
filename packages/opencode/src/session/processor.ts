@@ -289,6 +289,7 @@ export namespace SessionProcessor {
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
                     type: "step-finish",
+                    metadata: value.providerMetadata,
                     tokens: usage.tokens,
                     cost: usage.cost,
                   })
