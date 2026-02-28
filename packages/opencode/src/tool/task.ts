@@ -172,7 +172,8 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       // max_delegation_depth of 1 means subagents can spawn subagents (depth 0 -> 1 allowed)
       // max_delegation_depth of 2 means two levels of nesting (depth 0 -> 1 -> 2 allowed)
       const maxDepth = config.experimental?.max_delegation_depth ?? 0
-      const canDelegate = (session.depth ?? 0) < maxDepth
+      const level = await Session.depth(session.id)
+      const canDelegate = level < maxDepth
 
       log.info("TaskTool calling SessionPrompt.prompt", { sessionId: session.id })
       const result = await SessionPrompt.prompt({
