@@ -560,6 +560,9 @@ export type StepFinishPart = {
   reason: string
   snapshot?: string
   cost: number
+  metadata?: {
+    [key: string]: unknown
+  }
   tokens: {
     total?: number
     input: number
@@ -664,6 +667,35 @@ export type EventMessagePartRemoved = {
   }
 }
 
+export type SessionStatus =
+  | {
+      type: "idle"
+    }
+  | {
+      type: "retry"
+      attempt: number
+      message: string
+      next: number
+    }
+  | {
+      type: "busy"
+    }
+
+export type EventSessionStatus = {
+  type: "session.status"
+  properties: {
+    sessionID: string
+    status: SessionStatus
+  }
+}
+
+export type EventSessionIdle = {
+  type: "session.idle"
+  properties: {
+    sessionID: string
+  }
+}
+
 export type Todo = {
   /**
    * Brief description of the task
@@ -753,35 +785,6 @@ export type EventMcpBrowserOpenFailed = {
   properties: {
     mcpName: string
     url: string
-  }
-}
-
-export type SessionStatus =
-  | {
-      type: "idle"
-    }
-  | {
-      type: "retry"
-      attempt: number
-      message: string
-      next: number
-    }
-  | {
-      type: "busy"
-    }
-
-export type EventSessionStatus = {
-  type: "session.status"
-  properties: {
-    sessionID: string
-    status: SessionStatus
-  }
-}
-
-export type EventSessionIdle = {
-  type: "session.idle"
-  properties: {
-    sessionID: string
   }
 }
 
@@ -967,6 +970,7 @@ export type EventSessionHandoffCompleted = {
     targetSessionID: string
   }
 }
+
 export type Event =
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
@@ -989,6 +993,8 @@ export type Event =
   | EventMessagePartUpdated
   | EventMessagePartDelta
   | EventMessagePartRemoved
+  | EventSessionStatus
+  | EventSessionIdle
   | EventTodoUpdated
   | EventTuiPromptAppend
   | EventTuiCommandExecute
@@ -996,8 +1002,6 @@ export type Event =
   | EventTuiSessionSelect
   | EventMcpToolsChanged
   | EventMcpBrowserOpenFailed
-  | EventSessionStatus
-  | EventSessionIdle
   | EventSessionCompacted
   | EventCommandExecuted
   | EventSessionCreated
@@ -1049,17 +1053,6 @@ export type ServerConfig = {
    * Additional domains to allow for CORS
    */
   cors?: Array<string>
-}
-
-export type ThinkingConfig = {
-  /**
-   * Thinking effort level
-   */
-  effort?: "low" | "medium" | "high"
-  /**
-   * Token budget for thinking
-   */
-  budgetTokens?: number
 }
 
 export type PermissionActionConfig = "ask" | "allow" | "deny"
@@ -1134,7 +1127,6 @@ export type AgentConfig = {
    * @deprecated Use 'steps' field instead.
    */
   maxSteps?: number
-  thinking?: ThinkingConfig
   permission?: PermissionConfig
   [key: string]:
     | unknown
@@ -1159,7 +1151,6 @@ export type AgentConfig = {
     | "error"
     | "info"
     | number
-    | ThinkingConfig
     | PermissionConfig
     | undefined
 }
@@ -1246,6 +1237,19 @@ export type ProviderConfig = {
      */
     setCacheKey?: boolean
     /**
+     * Enable Responses API WebSocket mode for this provider when available
+     */
+    websocketMode?: boolean
+    compactionThreshold?: number | false
+    /**
+     * Run /responses/compact before /responses requests
+     */
+    standaloneCompaction?: boolean
+    /**
+     * Idle timeout in milliseconds before closing an open Responses WebSocket. Default is 300000 (5 minutes). Set to false to disable idle eviction.
+     */
+    responsesSocketIdleTimeoutMs?: number | false
+    /**
      * Timeout in milliseconds for requests to this provider. Default is 300000 (5 minutes). Set to false to disable timeout.
      */
     timeout?: number | false
@@ -1253,7 +1257,7 @@ export type ProviderConfig = {
      * Timeout in milliseconds between streamed SSE chunks for this provider. If no chunk arrives within this window, the request is aborted.
      */
     chunkTimeout?: number
-    [key: string]: unknown | string | boolean | number | false | number | undefined
+    [key: string]: unknown | string | boolean | number | false | undefined
   }
 }
 
@@ -1711,6 +1715,10 @@ export type GlobalSession = {
   workspaceID?: string
   directory: string
   parentID?: string
+  /**
+   * Nesting depth of session (0 for root, increments for subagent sessions)
+   */
+  depth?: number
   summary?: {
     additions: number
     deletions: number
@@ -1913,7 +1921,6 @@ export type Agent = {
   topP?: number
   temperature?: number
   color?: string
-  thinking?: ThinkingConfig
   permission: PermissionRuleset
   model?: {
     modelID: string
