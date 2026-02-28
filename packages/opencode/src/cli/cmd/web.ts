@@ -5,6 +5,7 @@ import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import { Flag } from "../../flag/flag"
 import open from "open"
 import { networkInterfaces } from "os"
+import { Instance } from "../../project/instance"
 
 function getNetworkIPs() {
   const nets = networkInterfaces()
@@ -26,6 +27,18 @@ function getNetworkIPs() {
   }
 
   return results
+}
+
+function waitForShutdownSignal() {
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      process.off("SIGINT", done)
+      process.off("SIGTERM", done)
+      resolve()
+    }
+    process.on("SIGINT", done)
+    process.on("SIGTERM", done)
+  })
 }
 
 export const WebCommand = cmd({
@@ -75,7 +88,11 @@ export const WebCommand = cmd({
       open(displayUrl).catch(() => {})
     }
 
-    await new Promise(() => {})
-    await server.stop()
+    try {
+      await waitForShutdownSignal()
+    } finally {
+      await Instance.disposeAll()
+      await server.stop(true)
+    }
   },
 })
