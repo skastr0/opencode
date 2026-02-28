@@ -2,6 +2,7 @@ import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { useSDK } from "@tui/context/sdk"
 import { useSync } from "@tui/context/sync"
 import { selectedForeground, useTheme } from "@tui/context/theme"
+import { useTuiConfig } from "@tui/context/tui-config"
 import { useKV } from "@tui/context/kv"
 import { useDialog } from "@tui/ui/dialog"
 import { DialogPrompt } from "@tui/ui/dialog-prompt"
@@ -82,6 +83,7 @@ export function DiffPane(props: {
 }) {
   const sdk = useSDK()
   const sync = useSync()
+  const tui = useTuiConfig()
   const { theme, syntax } = useTheme()
   const kv = useKV()
   const toast = useToast()
@@ -144,7 +146,7 @@ export function DiffPane(props: {
   })
 
   const view = createMemo(() => {
-    const diffStyle = sync.data.config.tui?.diff_style
+    const diffStyle = tui.diff_style
     if (diffStyle === "stacked") return "unified"
     return dimensions().width > 120 ? "split" : "unified"
   })
