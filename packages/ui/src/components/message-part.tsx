@@ -10,7 +10,6 @@ import {
   Show,
   Switch,
   onCleanup,
-  Index,
   type JSX,
 } from "solid-js"
 import { createStore } from "solid-js/store"
