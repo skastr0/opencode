@@ -260,6 +260,7 @@ When constructing the summary, try to stick to this template:
           tools: original.tools,
           system: original.system,
           variant: original.variant,
+          fast: original.fast,
         })
         for (const part of replay.parts) {
           if (part.type === "compaction") continue
@@ -282,6 +283,7 @@ When constructing the summary, try to stick to this template:
           time: { created: Date.now() },
           agent: userMessage.agent,
           model: userMessage.model,
+          fast: userMessage.fast,
         })
         const text =
           (input.overflow
@@ -317,6 +319,7 @@ When constructing the summary, try to stick to this template:
       }),
       auto: z.boolean(),
       overflow: z.boolean().optional(),
+      fast: z.boolean().optional(),
     }),
     async (input) => {
       const msg = await Session.updateMessage({
@@ -325,6 +328,7 @@ When constructing the summary, try to stick to this template:
         model: input.model,
         sessionID: input.sessionID,
         agent: input.agent,
+        fast: input.fast,
         time: {
           created: Date.now(),
         },

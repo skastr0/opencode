@@ -359,6 +359,35 @@ function App() {
   )
 
   const connected = useConnected()
+  type FastAction = "toggle" | "on" | "off" | "status"
+
+  function fast(action: FastAction) {
+    if (!local.model.current()) {
+      toast.show({
+        variant: "warning",
+        message: "Connect a provider to use fast mode",
+        duration: 3000,
+      })
+      return
+    }
+    const current = local.model.fast.current() === true
+    if (action === "status") {
+      toast.show({
+        variant: "info",
+        message: current ? "Fast mode is on" : "Fast mode is off",
+        duration: 3000,
+      })
+      return
+    }
+    const next = action === "toggle" ? local.model.fast.toggle() : action === "on"
+    if (action !== "toggle") local.model.fast.set(next)
+    toast.show({
+      variant: next ? "success" : "info",
+      message: next ? "Fast mode enabled" : "Fast mode disabled",
+      duration: 3000,
+    })
+  }
+
   const returnTo = () => {
     if (route.data.type === "home") {
       if (!route.data.initialPrompt) return { type: "home" } as const
@@ -539,6 +568,19 @@ function App() {
       hidden: true,
       onSelect: () => {
         local.model.variant.cycle()
+      },
+    },
+    {
+      title: local.model.fast.current() ? "Disable fast mode" : "Enable fast mode",
+      description: "toggle priority routing for supported Codex sessions",
+      value: "fast.toggle",
+      category: "Agent",
+      slash: {
+        name: "fast",
+      },
+      onSelect: (dialog) => {
+        fast("toggle")
+        dialog.clear()
       },
     },
     {

@@ -6,7 +6,9 @@ import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Session } from "../../src/session"
 import { MessageV2 } from "../../src/session/message-v2"
 import { SessionPrompt } from "../../src/session/prompt"
+import { TaskTool } from "../../src/tool/task"
 import { Log } from "../../src/util/log"
+import { Identifier } from "../../src/id/id"
 import { tmpdir } from "../fixture/fixture"
 
 Log.init({ print: false })
@@ -208,5 +210,243 @@ describe("session.prompt agent variant", () => {
       if (prev === undefined) delete process.env.OPENAI_API_KEY
       else process.env.OPENAI_API_KEY = prev
     }
+  })
+})
+
+describe("session.prompt fast", () => {
+  test("uses agent fast by default and lets input override it", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      config: {
+        agent: {
+          build: {
+            model: "openai/gpt-5.4",
+            fast: true,
+          },
+        },
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const session = await Session.create({})
+
+        const match = await SessionPrompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [{ type: "text", text: "hello" }],
+        })
+
+        if (match.info.role !== "user") throw new Error("expected user message")
+        expect(match.info.fast).toBe(true)
+
+        const override = await SessionPrompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          fast: false,
+          noReply: true,
+          parts: [{ type: "text", text: "hello again" }],
+        })
+
+        if (override.info.role !== "user") throw new Error("expected user message")
+        expect(override.info.fast).toBe(false)
+
+        await Session.remove(session.id)
+      },
+    })
+  })
+
+  test("stores fast on user messages and preserves it when forking a session", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      config: {
+        agent: {
+          build: {
+            model: "openai/gpt-5.4",
+          },
+        },
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const session = await Session.create({})
+        const msg = await SessionPrompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+          fast: true,
+          noReply: true,
+          parts: [{ type: "text", text: "hello" }],
+        })
+
+        if (msg.info.role !== "user") throw new Error("expected user message")
+        expect(msg.info.fast).toBe(true)
+
+        const stored = await MessageV2.get({
+          sessionID: session.id,
+          messageID: msg.info.id,
+        })
+        if (stored.info.role !== "user") throw new Error("expected stored user message")
+        expect(stored.info.fast).toBe(true)
+
+        const fork = await Session.fork({ sessionID: session.id })
+        const msgs = await Session.messages({ sessionID: fork.id })
+        const forked = msgs.find((item) => item.info.role === "user")
+        if (!forked || forked.info.role !== "user") throw new Error("expected forked user message")
+        expect(forked.info.fast).toBe(true)
+
+        await Session.remove(fork.id)
+        await Session.remove(session.id)
+      },
+    })
+  })
+
+  test("forwards fast through command prompts", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      config: {
+        agent: {
+          build: {
+            model: "openai/gpt-5.4",
+          },
+        },
+        command: {
+          fast_test: {
+            template: "hello",
+          },
+        },
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const session = await Session.create({})
+        const original = SessionPrompt.prompt
+        let seen: SessionPrompt.PromptInput | undefined
+        ;(SessionPrompt as any).prompt = async (input: SessionPrompt.PromptInput) => {
+          seen = input
+          return {
+            info: {
+              id: Identifier.ascending("message"),
+              sessionID: input.sessionID,
+            },
+            parts: [],
+          }
+        }
+
+        try {
+          await SessionPrompt.command({
+            sessionID: session.id,
+            command: "fast_test",
+            arguments: "",
+            agent: "build",
+            model: "opencode/kimi-k2.5-free",
+            fast: true,
+          })
+        } finally {
+          ;(SessionPrompt as any).prompt = original
+        }
+
+        expect(seen?.fast).toBe(true)
+        await Session.remove(session.id)
+      },
+    })
+  })
+
+  test("uses subagent fast defaults for task sessions", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      config: {
+        agent: {
+          general: {
+            fast: true,
+          },
+        },
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const session = await Session.create({})
+        const parent = await SessionPrompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+          noReply: true,
+          parts: [{ type: "text", text: "parent" }],
+        })
+
+        if (parent.info.role !== "user") throw new Error("expected user message")
+
+        const assistant = await Session.updateMessage({
+          id: Identifier.ascending("message"),
+          sessionID: session.id,
+          parentID: parent.info.id,
+          role: "assistant",
+          mode: "build",
+          agent: "build",
+          cost: 0,
+          path: {
+            cwd: tmp.path,
+            root: tmp.path,
+          },
+          time: {
+            created: Date.now(),
+          },
+          tokens: {
+            input: 0,
+            output: 0,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+          modelID: "gpt-5.4",
+          providerID: "openai",
+        })
+
+        const original = SessionPrompt.prompt
+        ;(SessionPrompt as any).prompt = (input: SessionPrompt.PromptInput) =>
+          original({
+            ...input,
+            noReply: true,
+          })
+
+        try {
+          const task = await TaskTool.init()
+          const result = await task.execute(
+            {
+              description: "child task",
+              prompt: "hello from child",
+              subagent_type: "general",
+            },
+            {
+              sessionID: session.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { bypassAgentCheck: true },
+              messages: [],
+              metadata() {},
+              async ask() {},
+            },
+          )
+
+          const msgs = await Session.messages({ sessionID: result.metadata.sessionId })
+          const child = msgs.find((item) => item.info.role === "user")
+          if (!child || child.info.role !== "user") throw new Error("expected child user message")
+          expect(child.info.agent).toBe("general")
+          expect(child.info.fast).toBe(true)
+        } finally {
+          ;(SessionPrompt as any).prompt = original
+        }
+
+        await Session.remove(session.id)
+      },
+    })
   })
 })

@@ -126,12 +126,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           modelID: string
         }[]
         variant: Record<string, string | undefined>
+        fast: Record<string, boolean | undefined>
       }>({
         ready: false,
         model: {},
         recent: [],
         favorite: [],
         variant: {},
+        fast: {},
       })
 
       const filePath = path.join(Global.Path.state, "model.json")
@@ -149,6 +151,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           recent: modelStore.recent,
           favorite: modelStore.favorite,
           variant: modelStore.variant,
+          fast: modelStore.fast,
         })
       }
 
@@ -157,6 +160,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           if (Array.isArray(x.recent)) setModelStore("recent", x.recent)
           if (Array.isArray(x.favorite)) setModelStore("favorite", x.favorite)
           if (typeof x.variant === "object" && x.variant !== null) setModelStore("variant", x.variant)
+          if (typeof x.fast === "object" && x.fast !== null) setModelStore("fast", x.fast)
         })
         .catch(() => {})
         .finally(() => {
@@ -215,6 +219,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           ) ?? undefined
         )
       })
+
+      function key(model: { providerID: string; modelID: string }) {
+        return `${model.providerID}/${model.modelID}`
+      }
 
       return {
         current: currentModel,
@@ -345,8 +353,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           current() {
             const m = currentModel()
             if (!m) return undefined
-            const key = `${m.providerID}/${m.modelID}`
-            return modelStore.variant[key]
+            return modelStore.variant[key(m)]
           },
           list() {
             const m = currentModel()
@@ -359,8 +366,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           set(value: string | undefined) {
             const m = currentModel()
             if (!m) return
-            const key = `${m.providerID}/${m.modelID}`
-            setModelStore("variant", key, value)
+            setModelStore("variant", key(m), value)
             save()
           },
           cycle() {
@@ -377,6 +383,24 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               return
             }
             this.set(variants[index + 1])
+          },
+        },
+        fast: {
+          current() {
+            const m = currentModel()
+            if (!m) return undefined
+            return modelStore.fast[key(m)]
+          },
+          set(value: boolean | undefined) {
+            const m = currentModel()
+            if (!m) return
+            setModelStore("fast", key(m), value)
+            save()
+          },
+          toggle() {
+            const next = !this.current()
+            this.set(next)
+            return next
           },
         },
       }

@@ -111,6 +111,7 @@ export namespace SessionPrompt {
     format: MessageV2.Format.optional(),
     system: z.string().optional(),
     variant: z.string().optional(),
+    fast: z.boolean().optional(),
     parts: z.array(
       z.discriminatedUnion("type", [
         MessageV2.TextPart.omit({
@@ -513,6 +514,7 @@ export namespace SessionPrompt {
             },
             agent: lastUser.agent,
             model: lastUser.model,
+            fast: lastUser.fast,
           }
           await Session.updateMessage(summaryUserMsg)
           await Session.updatePart({
@@ -558,6 +560,7 @@ export namespace SessionPrompt {
           agent: lastUser.agent,
           model: lastUser.model,
           auto: true,
+          fast: lastUser.fast,
         })
         continue
       }
@@ -724,6 +727,7 @@ export namespace SessionPrompt {
           model: lastUser.model,
           auto: true,
           overflow: !processor.message.finish,
+          fast: lastUser.fast,
         })
       }
       continue
@@ -977,6 +981,7 @@ export namespace SessionPrompt {
     const agent = await Agent.get(agentName)
 
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
+    const fast = input.fast ?? agent.fast
     const full =
       !input.variant && agent.variant
         ? await Provider.getModel(model.providerID, model.modelID).catch(() => undefined)
@@ -995,6 +1000,7 @@ export namespace SessionPrompt {
       system: input.system,
       format: input.format,
       variant,
+      fast,
     }
     using _ = defer(() => InstructionPrompt.clear(info.id))
 
@@ -1513,6 +1519,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         modelID: ModelID.zod,
       })
       .optional(),
+    fast: z.boolean().optional(),
     command: z.string(),
   })
   export type ShellInput = z.infer<typeof ShellInput>
@@ -1544,6 +1551,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       throw new Error(`Agent not found: ${input.agent}`)
     }
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
+    const fast = input.fast ?? agent.fast
     const userMsg: MessageV2.User = {
       id: MessageID.ascending(),
       sessionID: input.sessionID,
@@ -1556,6 +1564,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         providerID: model.providerID,
         modelID: model.modelID,
       },
+      fast,
     }
     await Session.updateMessage(userMsg)
     const userPart: MessageV2.Part = {
@@ -1766,6 +1775,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     arguments: z.string(),
     command: z.string(),
     variant: z.string().optional(),
+    fast: z.boolean().optional(),
     parts: z
       .array(
         z.discriminatedUnion("type", [
@@ -1924,6 +1934,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       agent: userAgent,
       parts,
       variant: input.variant,
+      fast: input.fast,
     })) as MessageV2.WithParts
 
     Bus.publish(Command.Event.Executed, {

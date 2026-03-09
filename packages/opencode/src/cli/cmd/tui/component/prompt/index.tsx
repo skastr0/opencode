@@ -167,6 +167,7 @@ export function Prompt(props: PromptProps) {
         local.agent.set(msg.agent)
         if (msg.model) local.model.set(msg.model)
         if (msg.variant) local.model.variant.set(msg.variant)
+        local.model.fast.set(msg.fast)
       } else if (availableAgents.length > 0) {
         // Message was from a subagent - use the first available agent (default)
         local.agent.set(availableAgents[0].name)
@@ -531,6 +532,52 @@ export function Prompt(props: PromptProps) {
     },
   ])
 
+  function clear() {
+    input.extmarks.clear()
+    setStore("prompt", {
+      input: "",
+      parts: [],
+    })
+    setStore("extmarkToPartIndex", new Map())
+    input.clear()
+  }
+
+  function fast(text: string) {
+    if (!text.startsWith("/fast")) return false
+    const [cmd, arg] = text.trim().split(/\s+/, 2)
+    if (cmd !== "/fast") return false
+    const action = arg ?? "toggle"
+    if (!["toggle", "on", "off", "status"].includes(action)) {
+      toast.show({
+        variant: "warning",
+        message: "Usage: /fast [toggle|on|off|status]",
+        duration: 3000,
+      })
+      return true
+    }
+    const current = local.model.fast.current() === true
+    if (action === "status") {
+      toast.show({
+        variant: "info",
+        message: current ? "Fast mode is on" : "Fast mode is off",
+        duration: 3000,
+      })
+      clear()
+      props.onSubmit?.()
+      return true
+    }
+    const next = action === "toggle" ? local.model.fast.toggle() : action === "on"
+    if (action !== "toggle") local.model.fast.set(next)
+    toast.show({
+      variant: next ? "success" : "info",
+      message: next ? "Fast mode enabled" : "Fast mode disabled",
+      duration: 3000,
+    })
+    clear()
+    props.onSubmit?.()
+    return true
+  }
+
   async function submit() {
     if (props.disabled) return
     if (autocomplete?.visible) return
@@ -550,6 +597,7 @@ export function Prompt(props: PromptProps) {
     if (!currentAgent) {
       return
     }
+    if (fast(trimmed)) return
 
     let sessionID = props.sessionID
     if (sessionID == null) {
@@ -595,6 +643,7 @@ export function Prompt(props: PromptProps) {
     // Capture mode before it gets reset
     const currentMode = store.mode
     const variant = local.model.variant.current()
+    const fastMode = local.model.fast.current()
 
     if (store.mode === "shell") {
       sdk.client.session.shell({
@@ -604,6 +653,7 @@ export function Prompt(props: PromptProps) {
           providerID: selectedModel.providerID,
           modelID: selectedModel.modelID,
         },
+        fast: fastMode,
         command: inputText,
       })
       setStore("mode", "normal")
@@ -630,6 +680,7 @@ export function Prompt(props: PromptProps) {
         model: `${selectedModel.providerID}/${selectedModel.modelID}`,
         messageID,
         variant,
+        fast: fastMode,
         parts: nonTextParts
           .filter((x) => x.type === "file")
           .map((x) => ({
@@ -646,6 +697,7 @@ export function Prompt(props: PromptProps) {
           agent: currentAgent.name,
           model: selectedModel,
           variant,
+          fast: fastMode,
           parts: [
             {
               id: PartID.ascending(),
@@ -774,6 +826,8 @@ export function Prompt(props: PromptProps) {
     const current = local.model.variant.current()
     return !!current
   })
+
+  const showFast = createMemo(() => local.model.fast.current() === true)
 
   const placeholderText = createMemo(() => {
     if (props.sessionID) return undefined
@@ -1037,6 +1091,12 @@ export function Prompt(props: PromptProps) {
                     <text fg={theme.textMuted}>·</text>
                     <text>
                       <span style={{ fg: theme.warning, bold: true }}>{local.model.variant.current()}</span>
+                    </text>
+                  </Show>
+                  <Show when={showFast()}>
+                    <text fg={theme.textMuted}>·</text>
+                    <text>
+                      <span style={{ fg: theme.success, bold: true }}>FAST</span>
                     </text>
                   </Show>
                 </box>

@@ -716,6 +716,7 @@ export namespace Config {
         .string()
         .optional()
         .describe("Default model variant for this agent (applies only when using the agent's configured model)."),
+      fast: z.boolean().optional().describe("Default FAST mode for this agent when prompts do not override it."),
       temperature: z.number().optional(),
       top_p: z.number().optional(),
       prompt: z.string().optional(),
@@ -750,6 +751,7 @@ export namespace Config {
         "name",
         "model",
         "variant",
+        "fast",
         "prompt",
         "description",
         "temperature",

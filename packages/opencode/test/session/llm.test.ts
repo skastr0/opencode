@@ -3,6 +3,7 @@ import path from "path"
 import { tool, type ModelMessage } from "ai"
 import z from "zod"
 import { LLM } from "../../src/session/llm"
+import { Auth } from "../../src/auth"
 import { Global } from "../../src/global"
 import { Instance } from "../../src/project/instance"
 import { Provider } from "../../src/provider/provider"
@@ -99,6 +100,17 @@ describe("session.llm.hasToolCalls", () => {
       },
     ] as ModelMessage[]
     expect(LLM.hasToolCalls(messages)).toBe(true)
+  })
+})
+
+describe("session.llm.serviceTier", () => {
+  test("returns priority only for OpenAI OAuth gpt-5.4 fast requests", () => {
+    expect(LLM.serviceTier({ provider: "openai", auth: "oauth", model: "gpt-5.4", fast: true })).toBe("priority")
+
+    expect(LLM.serviceTier({ provider: "openai", auth: "api", model: "gpt-5.4", fast: true })).toBeUndefined()
+    expect(LLM.serviceTier({ provider: "anthropic", auth: "oauth", model: "gpt-5.4", fast: true })).toBeUndefined()
+    expect(LLM.serviceTier({ provider: "openai", auth: "oauth", model: "gpt-5.2", fast: true })).toBeUndefined()
+    expect(LLM.serviceTier({ provider: "openai", auth: "oauth", model: "gpt-5.4", fast: false })).toBeUndefined()
   })
 })
 
@@ -532,6 +544,147 @@ describe("session.llm.stream", () => {
         const maxTokens = body.max_output_tokens as number | undefined
         const expectedMaxTokens = ProviderTransform.maxOutputTokens(resolved)
         expect(maxTokens).toBe(expectedMaxTokens)
+      },
+    })
+  })
+
+  test("preserves service_tier for OAuth gpt-5.4 fast requests", async () => {
+    const source = await loadFixture("openai", "gpt-5.2")
+    const model = {
+      ...source.model,
+      id: "gpt-5.4",
+      name: "GPT-5.4",
+    }
+    const response = createEventResponse(
+      [
+        {
+          type: "response.created",
+          response: {
+            id: "resp-fast-1",
+            created_at: Math.floor(Date.now() / 1000),
+            model: model.id,
+            service_tier: null,
+          },
+        },
+        {
+          type: "response.output_text.delta",
+          item_id: "item-fast-1",
+          delta: "Hello",
+          logprobs: null,
+        },
+        {
+          type: "response.completed",
+          response: {
+            incomplete_details: null,
+            usage: {
+              input_tokens: 1,
+              input_tokens_details: null,
+              output_tokens: 1,
+              output_tokens_details: null,
+            },
+            service_tier: null,
+          },
+        },
+      ],
+      true,
+    )
+
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            enabled_providers: ["openai"],
+            provider: {
+              openai: {
+                name: "OpenAI",
+                env: ["OPENAI_API_KEY"],
+                npm: "@ai-sdk/openai",
+                api: "https://api.openai.com/v1",
+                models: {
+                  [model.id]: model,
+                },
+                options: {
+                  websocketMode: false,
+                },
+              },
+            },
+          }),
+        )
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await Auth.set("openai", {
+          type: "oauth",
+          refresh: "test-refresh-token",
+          access: "test-access-token",
+          expires: Date.now() + 60_000,
+          accountId: "acc-test",
+        })
+
+        const original = globalThis.fetch
+        let capture: Capture | undefined
+
+        globalThis.fetch = Object.assign(
+          async (input: URL | RequestInfo, init?: RequestInit | BunFetchRequestInit) => {
+            const req = new Request(input, init)
+            capture = {
+              url: new URL(req.url),
+              headers: req.headers,
+              body: (await req.json()) as Record<string, unknown>,
+            }
+            return response.clone()
+          },
+          { preconnect: original.preconnect.bind(original) },
+        ) as typeof fetch
+
+        try {
+          const resolved = await Provider.getModel("openai", model.id)
+          const agent = {
+            name: "test",
+            mode: "primary",
+            options: {},
+            permission: [{ permission: "*", pattern: "*", action: "allow" }],
+            temperature: 0.2,
+          } satisfies Agent.Info
+
+          const user = {
+            id: "user-fast",
+            sessionID: "session-fast",
+            role: "user",
+            time: { created: Date.now() },
+            agent: agent.name,
+            model: { providerID: "openai", modelID: resolved.id },
+            fast: true,
+          } satisfies MessageV2.User
+
+          const stream = await LLM.stream({
+            user,
+            sessionID: user.sessionID,
+            model: resolved,
+            agent,
+            system: ["You are a helpful assistant."],
+            abort: new AbortController().signal,
+            messages: [{ role: "user", content: "Hello" }],
+            tools: {},
+          })
+
+          for await (const _ of stream.fullStream) {
+          }
+
+          expect(capture?.url.host).toBe("chatgpt.com")
+          expect(capture?.url.pathname).toBe("/backend-api/codex/responses")
+          expect(capture?.headers.get("authorization")).toBe("Bearer test-access-token")
+          expect(capture?.body.model).toBe(model.id)
+          expect(capture?.body.service_tier).toBe("priority")
+        } finally {
+          globalThis.fetch = original
+          await Auth.remove("openai")
+        }
       },
     })
   })

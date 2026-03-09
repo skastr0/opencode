@@ -55,6 +55,14 @@ export namespace LLM {
     text: Promise<string>
   }
 
+  export function serviceTier(input: { provider: string; auth?: Auth.Info["type"]; model: string; fast?: boolean }) {
+    if (input.provider !== "openai") return
+    if (input.auth !== "oauth") return
+    if (input.model !== "gpt-5.4") return
+    if (input.fast !== true) return
+    return "priority" as const
+  }
+
   export async function stream(input: StreamInput) {
     const l = log
       .clone()
@@ -121,6 +129,13 @@ export namespace LLM {
       mergeDeep(input.agent.options),
       mergeDeep(variant),
     )
+    const tier = serviceTier({
+      provider: provider.id,
+      auth: auth?.type,
+      model: input.model.id,
+      fast: input.user.fast,
+    })
+    if (tier) options.serviceTier = tier
     if (isCodex) {
       options.instructions = SystemPrompt.instructions()
     }
@@ -328,7 +343,8 @@ export namespace LLM {
                   : headers && typeof headers === "object"
                     ? (headers as Record<string, string>)["x-opencode-transport"]
                     : undefined
-              const transport = raw === "responses-websocket" ? "websocket" : raw === "responses-http" ? "http" : undefined
+              const transport =
+                raw === "responses-websocket" ? "websocket" : raw === "responses-http" ? "http" : undefined
               if (!transport) return result
               return {
                 ...result,
@@ -388,5 +404,4 @@ export namespace LLM {
     }
     return false
   }
-
 }
