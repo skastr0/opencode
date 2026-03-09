@@ -253,6 +253,7 @@ export type UserMessage = {
     [key: string]: boolean
   }
   variant?: string
+  fast?: boolean
 }
 
 export type ProviderAuthError = {
@@ -963,6 +964,7 @@ export type EventWorktreeFailed = {
     message: string
   }
 }
+
 export type EventSessionHandoffCompleted = {
   type: "session.handoff.completed"
   properties: {
@@ -3324,6 +3326,7 @@ export type SessionPromptData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    fast?: boolean
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3524,6 +3527,7 @@ export type SessionPromptAsyncData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    fast?: boolean
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3566,6 +3570,7 @@ export type SessionCommandData = {
     arguments: string
     command: string
     variant?: string
+    fast?: boolean
     parts?: Array<{
       id?: string
       type: "file"
@@ -3617,6 +3622,7 @@ export type SessionShellData = {
       providerID: string
       modelID: string
     }
+    fast?: boolean
     command: string
   }
   path: {
@@ -4797,6 +4803,7 @@ export type SessionHandoffData = {
   }
   query?: {
     directory?: string
+    workspace?: string
   }
   url: "/session/{sessionID}/handoff"
 }
