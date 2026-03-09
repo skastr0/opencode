@@ -16,7 +16,7 @@ import { Installation } from "../installation"
 import { Flag } from "../flag/flag"
 import { iife } from "@/util/iife"
 
-declare const OPENCODE_MIGRATIONS: { sql: string; timestamp: number; name: string }[] | undefined
+declare const OPENCODE_MIGRATIONS: { sql: string; timestamp: number; name?: string }[] | undefined
 
 export const NotFoundError = NamedError.create(
   "NotFoundError",
@@ -42,6 +42,23 @@ export namespace Database {
   type Client = SQLiteBunDatabase
 
   type Journal = { sql: string; timestamp: number; name: string }[]
+
+  function normalize(entries: { sql: string; timestamp: number; name?: string }[]): Journal {
+    let missing = 0
+    const result = entries.map((entry, i) => {
+      if (entry.name) return { sql: entry.sql, timestamp: entry.timestamp, name: entry.name }
+      missing++
+      return {
+        sql: entry.sql,
+        timestamp: entry.timestamp,
+        name: `${entry.timestamp}-${i}`,
+      }
+    })
+    if (missing > 0) {
+      log.warn("migration entries missing names", { missing })
+    }
+    return result
+  }
 
   const state = {
     sqlite: undefined as BunDatabase | undefined,
@@ -98,7 +115,7 @@ export namespace Database {
     // Apply schema migrations
     const entries =
       typeof OPENCODE_MIGRATIONS !== "undefined"
-        ? OPENCODE_MIGRATIONS
+        ? normalize(OPENCODE_MIGRATIONS)
         : migrations(path.join(import.meta.dirname, "../../migration"))
     if (entries.length > 0) {
       log.info("applying migrations", {
