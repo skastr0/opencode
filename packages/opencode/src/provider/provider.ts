@@ -848,7 +848,7 @@ export namespace Provider {
       using _ = log.time("state")
       const config = await Config.get()
       const modelsDev = await ModelsDev.get()
-      const database = mapValues(modelsDev, fromModelsDevProvider)
+      const database: Record<string, Info> = mapValues(modelsDev, fromModelsDevProvider)
 
       database["claude-agent-sdk"] = {
         id: "claude-agent-sdk",
@@ -1029,7 +1029,10 @@ export namespace Provider {
         if (!hasAuth) continue
 
         if (auth) {
-          const options = await plugin.auth.loader(() => Auth.get(providerID) as any, database[plugin.auth.provider])
+          const options = await plugin.auth.loader(
+            () => Auth.get(providerID) as any,
+            database[plugin.auth.provider] as Info,
+          )
           const opts = options ?? {}
           const patch: Partial<Info> = providers[providerID] ? { options: opts } : { source: "custom", options: opts }
           mergeProvider(providerID, patch)
@@ -1042,7 +1045,7 @@ export namespace Provider {
           if (!enterpriseAuth) continue
           const enterpriseOptions = await plugin.auth.loader(
             () => Auth.get(enterpriseProviderID) as any,
-            database[enterpriseProviderID],
+            database[enterpriseProviderID] as Info,
           )
           const opts = enterpriseOptions ?? {}
           const patch: Partial<Info> = providers[enterpriseProviderID]
@@ -1563,7 +1566,9 @@ export namespace Provider {
 
         const responsesSocketSession =
           isOpenAIResponsesRequest && parsedBody ? getResponsesSocketSession(parsedBody) : undefined
-        const responsesSocketState = responsesSocketSession ? getResponsesSocketState(responsesSocketSession) : undefined
+        const responsesSocketState = responsesSocketSession
+          ? getResponsesSocketState(responsesSocketSession)
+          : undefined
         const responsesSocketReady = Date.now() >= responsesSocketRetryAfter
 
         if (
@@ -1645,9 +1650,7 @@ export namespace Provider {
                 }
 
                 const enqueueEvent = (value: unknown) => {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}
-
-`))
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`))
                 }
 
                 const finish = (error?: string) => {
@@ -1669,9 +1672,7 @@ export namespace Provider {
                     closeResponsesWebSocket(responsesSocketSession, false, "stream-error")
                   }
 
-                  controller.enqueue(encoder.encode("data: [DONE]
-
-"))
+                  controller.enqueue(encoder.encode("data: [DONE]\n\n"))
                   controller.close()
                 }
 
@@ -1977,7 +1978,7 @@ export namespace Provider {
 
     const provider = Object.values(providers).find((p) => !cfg.provider || Object.keys(cfg.provider).includes(p.id))
     if (!provider) throw new Error("no providers found")
-    const [model] = sort(Object.values(provider.models))
+    const [model] = sort(Object.values(provider.models) as Model[])
     if (!model) throw new Error("no models found")
     return {
       providerID: provider.id,
