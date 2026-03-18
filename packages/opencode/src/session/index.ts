@@ -296,15 +296,15 @@ export namespace Session {
     })
   })
 
-  export const depth = fn(Identifier.schema("session"), async (sessionID) => {
-    const seen = new Set<string>()
-    let id: string | undefined = sessionID
+  export const depth = fn(SessionID.zod, async (sessionID) => {
+    const seen = new Set<SessionID>()
+    let id: SessionID | undefined = sessionID
     let result = 0
     while (id) {
       if (seen.has(id)) break
       seen.add(id)
-      const current: string = id
-      const row: { parent_id: string | null } | undefined = Database.use((db) =>
+      const current: SessionID = id
+      const row: { parent_id: SessionID | null } | undefined = Database.use((db) =>
         db
           .select({ parent_id: SessionTable.parent_id })
           .from(SessionTable)

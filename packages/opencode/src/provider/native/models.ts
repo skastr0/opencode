@@ -1,9 +1,10 @@
 import type { Provider } from "../provider"
+import { ModelID, ProviderID } from "../schema"
 
 export const CLAUDE_AGENT_SDK_MODELS: Record<string, Provider.Model> = {
   "claude-opus-4-5": {
-    id: "claude-opus-4-5",
-    providerID: "claude-agent-sdk",
+    id: ModelID.make("claude-opus-4-5"),
+    providerID: ProviderID.make("claude-agent-sdk"),
     name: "Claude Opus 4.5",
     family: "claude-4",
     api: {
@@ -32,8 +33,8 @@ export const CLAUDE_AGENT_SDK_MODELS: Record<string, Provider.Model> = {
     },
   },
   "claude-sonnet-4-5": {
-    id: "claude-sonnet-4-5",
-    providerID: "claude-agent-sdk",
+    id: ModelID.make("claude-sonnet-4-5"),
+    providerID: ProviderID.make("claude-agent-sdk"),
     name: "Claude Sonnet 4.5",
     family: "claude-4",
     api: {
@@ -62,8 +63,8 @@ export const CLAUDE_AGENT_SDK_MODELS: Record<string, Provider.Model> = {
     },
   },
   "claude-haiku-4-5": {
-    id: "claude-haiku-4-5",
-    providerID: "claude-agent-sdk",
+    id: ModelID.make("claude-haiku-4-5"),
+    providerID: ProviderID.make("claude-agent-sdk"),
     name: "Claude Haiku 4.5",
     family: "claude-4",
     api: {

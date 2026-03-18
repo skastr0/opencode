@@ -6,7 +6,9 @@ import { Auth } from "../../src/auth"
 import { Config } from "../../src/config/config"
 import { Plugin } from "../../src/plugin"
 import { Provider } from "../../src/provider/provider"
+import { ModelID, ProviderID } from "../../src/provider/schema"
 import type { MessageV2 } from "../../src/session/message-v2"
+import { MessageID, SessionID } from "../../src/session/schema"
 import type { ClaudeNativeInput } from "../../src/provider/native/claude-agent-sdk"
 
 const calls: ClaudeNativeInput[] = []
@@ -33,7 +35,7 @@ const setupMocks = () => {
   Provider.getLanguage = async () => ({}) as Awaited<ReturnType<typeof Provider.getLanguage>>
   Provider.getProvider = async () =>
     ({
-      id: "claude-agent-sdk",
+      id: ProviderID.make("claude-agent-sdk"),
       name: "Claude Agent SDK",
       source: "custom",
       env: [],
@@ -54,8 +56,8 @@ const loadLLM = async () =>
   )) as typeof import("../../src/session/llm")
 
 const modelBase: Provider.Model = {
-  id: "claude-sonnet-4-5",
-  providerID: "claude-agent-sdk",
+  id: ModelID.make("claude-sonnet-4-5"),
+  providerID: ProviderID.make("claude-agent-sdk"),
   name: "Claude Sonnet 4.5",
   family: "claude-4",
   api: {
@@ -83,7 +85,7 @@ const modelBase: Provider.Model = {
 
 const modelAlt: Provider.Model = {
   ...modelBase,
-  id: "claude-haiku-4-5",
+  id: ModelID.make("claude-haiku-4-5"),
   api: {
     ...modelBase.api,
     id: "claude-haiku-4-5",
@@ -99,14 +101,14 @@ const baseAgent = {
 } as Agent.Info
 
 const baseUser = {
-  id: "msg_1",
-  sessionID: "ses_test",
+  id: MessageID.make("msg_1"),
+  sessionID: SessionID.make("ses_test"),
   role: "user",
   time: { created: Date.now() },
   agent: "build",
   model: {
-    providerID: "claude-agent-sdk",
-    modelID: "claude-sonnet-4-5",
+    providerID: ProviderID.make("claude-agent-sdk"),
+    modelID: ModelID.make("claude-sonnet-4-5"),
   },
 } as MessageV2.User
 
@@ -134,7 +136,7 @@ describe("session.llm.nativeSession", () => {
   test("stores and resumes sdk session ids", async () => {
     setupMocks()
     const { LLM } = await loadLLM()
-    const sessionID = "ses_native_1"
+    const sessionID = SessionID.make("ses_native_1")
     await LLM.stream({
       user: { ...baseUser, sessionID },
       sessionID,
@@ -164,7 +166,7 @@ describe("session.llm.nativeSession", () => {
   test("invalidates stored session on model change", async () => {
     setupMocks()
     const { LLM } = await loadLLM()
-    const sessionID = "ses_native_2"
+    const sessionID = SessionID.make("ses_native_2")
     await LLM.stream({
       user: { ...baseUser, sessionID },
       sessionID,

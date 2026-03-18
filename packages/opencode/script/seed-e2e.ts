@@ -54,3 +54,5 @@ const seed = async () => {
 }
 
 await seed()
+
+export {}

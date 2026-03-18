@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { LanguageModelV2Prompt } from "@ai-sdk/provider"
 import type { Provider } from "../../../src/provider/provider"
+import { ModelID, ProviderID } from "../../../src/provider/schema"
 
 type SDKMessage = Record<string, unknown>
 
@@ -63,8 +64,8 @@ const loadStream = async () => {
 }
 
 const model: Provider.Model = {
-  id: "claude-sonnet-4-5",
-  providerID: "claude-agent-sdk",
+  id: ModelID.make("claude-sonnet-4-5"),
+  providerID: ProviderID.make("claude-agent-sdk"),
   name: "Claude Sonnet 4.5",
   family: "claude-4",
   api: {

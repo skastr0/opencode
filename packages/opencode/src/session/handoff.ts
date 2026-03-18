@@ -1,10 +1,11 @@
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import { Session } from "."
-import { Identifier } from "../id/id"
 import { Instance } from "../project/instance"
 import { Provider } from "../provider/provider"
+import { ModelID, ProviderID } from "../provider/schema"
 import { MessageV2 } from "./message-v2"
+import { MessageID, PartID, SessionID } from "./schema"
 import { TuiEvent } from "../cli/cmd/tui/event"
 import { FileTime } from "../file/time"
 import { Log } from "../util/log"
@@ -21,7 +22,7 @@ export namespace SessionHandoff {
   const log = Log.create({ service: "session.handoff" })
 
   // Lock to prevent concurrent handoffs from the same session
-  const activeHandoffs = new Set<string>()
+  const activeHandoffs = new Set<SessionID>()
 
   export const Event = {
     Completed: BusEvent.define(
@@ -102,17 +103,17 @@ export namespace SessionHandoff {
   /**
    * Get the file path where the session is stored.
    */
-  function getSessionFilePath(sessionID: string, projectID: string): string {
+  function getSessionFilePath(sessionID: SessionID, projectID: string): string {
     return path.join(Global.Path.data, "storage", "session", projectID, `${sessionID}.json`)
   }
 
   export const create = fn(
     z.object({
-      sessionID: Identifier.schema("session"),
+      sessionID: SessionID.zod,
       instruction: z.string(),
       model: z.object({
-        providerID: z.string(),
-        modelID: z.string(),
+        providerID: ProviderID.zod,
+        modelID: ModelID.zod,
       }),
     }),
     async (input) => {
@@ -145,8 +146,7 @@ export namespace SessionHandoff {
         const sessionFilePath = getSessionFilePath(input.sessionID, originalSession.projectID)
 
         // Files read during session
-        const filesRead = FileTime.state().read[input.sessionID] ?? {}
-        const filesReadList = Object.keys(filesRead)
+        const filesReadList = (await FileTime.list(input.sessionID))
           .map((f) => f.replace(Instance.worktree + "/", ""))
           .sort()
 
@@ -264,7 +264,7 @@ export namespace SessionHandoff {
         })
 
         const msg = await Session.updateMessage({
-          id: Identifier.ascending("message"),
+          id: MessageID.ascending(),
           role: "user",
           sessionID: newSession.id,
           agent: userMessage.agent,
@@ -275,7 +275,7 @@ export namespace SessionHandoff {
         })
 
         await Session.updatePart({
-          id: Identifier.ascending("part"),
+          id: PartID.ascending(),
           messageID: msg.id,
           sessionID: newSession.id,
           type: "text",

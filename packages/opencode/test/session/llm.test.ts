@@ -643,7 +643,7 @@ describe("session.llm.stream", () => {
         ) as typeof fetch
 
         try {
-          const resolved = await Provider.getModel("openai", model.id)
+          const resolved = await Provider.getModel(ProviderID.openai, ModelID.make(model.id))
           const agent = {
             name: "test",
             mode: "primary",
@@ -653,12 +653,12 @@ describe("session.llm.stream", () => {
           } satisfies Agent.Info
 
           const user = {
-            id: "user-fast",
-            sessionID: "session-fast",
+            id: MessageID.make("user-fast"),
+            sessionID: SessionID.make("session-fast"),
             role: "user",
             time: { created: Date.now() },
             agent: agent.name,
-            model: { providerID: "openai", modelID: resolved.id },
+            model: { providerID: ProviderID.openai, modelID: resolved.id },
             fast: true,
           } satisfies MessageV2.User
 
@@ -782,8 +782,8 @@ describe("session.llm.stream", () => {
       await Instance.provide({
         directory: tmp.path,
         fn: async () => {
-          const resolved = await Provider.getModel("openai", model.id)
-          const sessionID = "session-test-ws"
+          const resolved = await Provider.getModel(ProviderID.openai, ModelID.make(model.id))
+          const sessionID = SessionID.make("session-test-ws")
           const agent = {
             name: "test",
             mode: "primary",
@@ -793,12 +793,12 @@ describe("session.llm.stream", () => {
           } satisfies Agent.Info
 
           const user = {
-            id: "user-ws",
+            id: MessageID.make("user-ws"),
             sessionID,
             role: "user",
             time: { created: Date.now() },
             agent: agent.name,
-            model: { providerID: "openai", modelID: resolved.id },
+            model: { providerID: ProviderID.openai, modelID: resolved.id },
             variant: "high",
           } satisfies MessageV2.User
 
@@ -915,8 +915,8 @@ describe("session.llm.stream", () => {
       await Instance.provide({
         directory: tmp.path,
         fn: async () => {
-          const resolved = await Provider.getModel("openai", model.id)
-          const sessionID = "session-test-ws-http-fallback"
+          const resolved = await Provider.getModel(ProviderID.openai, ModelID.make(model.id))
+          const sessionID = SessionID.make("session-test-ws-http-fallback")
           const agent = {
             name: "test",
             mode: "primary",
@@ -926,12 +926,12 @@ describe("session.llm.stream", () => {
           } satisfies Agent.Info
 
           const user = {
-            id: "user-ws-http-fallback",
+            id: MessageID.make("user-ws-http-fallback"),
             sessionID,
             role: "user",
             time: { created: Date.now() },
             agent: agent.name,
-            model: { providerID: "openai", modelID: resolved.id },
+            model: { providerID: ProviderID.openai, modelID: resolved.id },
             variant: "high",
           } satisfies MessageV2.User
 
@@ -1057,7 +1057,7 @@ describe("session.llm.stream", () => {
       await Instance.provide({
         directory: tmp.path,
         fn: async () => {
-          const resolved = await Provider.getModel("openai", model.id)
+          const resolved = await Provider.getModel(ProviderID.openai, ModelID.make(model.id))
           const agent = {
             name: "test",
             mode: "primary",
@@ -1067,22 +1067,22 @@ describe("session.llm.stream", () => {
           } satisfies Agent.Info
 
           const userA = {
-            id: "user-ws-parallel-a",
-            sessionID: "session-test-ws-parallel-a",
+            id: MessageID.make("user-ws-parallel-a"),
+            sessionID: SessionID.make("session-test-ws-parallel-a"),
             role: "user",
             time: { created: Date.now() },
             agent: agent.name,
-            model: { providerID: "openai", modelID: resolved.id },
+            model: { providerID: ProviderID.openai, modelID: resolved.id },
             variant: "high",
           } satisfies MessageV2.User
 
           const userB = {
-            id: "user-ws-parallel-b",
-            sessionID: "session-test-ws-parallel-b",
+            id: MessageID.make("user-ws-parallel-b"),
+            sessionID: SessionID.make("session-test-ws-parallel-b"),
             role: "user",
             time: { created: Date.now() },
             agent: agent.name,
-            model: { providerID: "openai", modelID: resolved.id },
+            model: { providerID: ProviderID.openai, modelID: resolved.id },
             variant: "high",
           } satisfies MessageV2.User
 
@@ -1219,8 +1219,8 @@ describe("session.llm.stream", () => {
       await Instance.provide({
         directory: tmp.path,
         fn: async () => {
-          const resolved = await Provider.getModel("openai", model.id)
-          const sessionID = "session-test-ws-idle"
+          const resolved = await Provider.getModel(ProviderID.openai, ModelID.make(model.id))
+          const sessionID = SessionID.make("session-test-ws-idle")
           const agent = {
             name: "test",
             mode: "primary",
@@ -1230,12 +1230,12 @@ describe("session.llm.stream", () => {
           } satisfies Agent.Info
 
           const user = {
-            id: "user-ws-idle",
+            id: MessageID.make("user-ws-idle"),
             sessionID,
             role: "user",
             time: { created: Date.now() },
             agent: agent.name,
-            model: { providerID: "openai", modelID: resolved.id },
+            model: { providerID: ProviderID.openai, modelID: resolved.id },
             variant: "high",
           } satisfies MessageV2.User
 

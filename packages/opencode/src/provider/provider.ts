@@ -851,7 +851,7 @@ export namespace Provider {
       const database: Record<string, Info> = mapValues(modelsDev, fromModelsDevProvider)
 
       database["claude-agent-sdk"] = {
-        id: "claude-agent-sdk",
+        id: ProviderID.make("claude-agent-sdk"),
         source: "custom",
         name: "Claude Agent SDK",
         env: [],

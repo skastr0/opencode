@@ -24,7 +24,8 @@ import { Command } from "../command"
 import { Global } from "../global"
 import { WorkspaceContext } from "../control-plane/workspace-context"
 import { WorkspaceID } from "../control-plane/schema"
-import { ProviderID } from "../provider/schema"
+import { ModelID, ProviderID } from "../provider/schema"
+import { SessionID } from "../session/schema"
 import { WorkspaceRouterMiddleware } from "../control-plane/workspace-router-middleware"
 import { Session } from "../session"
 import { ProjectRoutes } from "./routes/project"
@@ -274,15 +275,15 @@ export namespace Server {
         validator(
           "param",
           z.object({
-            sessionID: z.string().meta({ description: "Source session ID" }),
+            sessionID: SessionID.zod.meta({ description: "Source session ID" }),
           }),
         ),
         validator(
           "json",
           z.object({
             instruction: z.string().meta({ description: "Handoff instruction/focus" }),
-            modelID: z.string(),
-            providerID: z.string(),
+            modelID: ModelID.zod,
+            providerID: ProviderID.zod,
           }),
         ),
         async (c) => {

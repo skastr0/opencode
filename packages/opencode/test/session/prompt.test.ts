@@ -5,10 +5,10 @@ import { Instance } from "../../src/project/instance"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Session } from "../../src/session"
 import { MessageV2 } from "../../src/session/message-v2"
+import { MessageID } from "../../src/session/schema"
 import { SessionPrompt } from "../../src/session/prompt"
 import { TaskTool } from "../../src/tool/task"
 import { Log } from "../../src/util/log"
-import { Identifier } from "../../src/id/id"
 import { tmpdir } from "../fixture/fixture"
 
 Log.init({ print: false })
@@ -277,7 +277,7 @@ describe("session.prompt fast", () => {
         const msg = await SessionPrompt.prompt({
           sessionID: session.id,
           agent: "build",
-          model: { providerID: "openai", modelID: "gpt-5.4" },
+          model: { providerID: ProviderID.openai, modelID: ModelID.make("gpt-5.4") },
           fast: true,
           noReply: true,
           parts: [{ type: "text", text: "hello" }],
@@ -332,7 +332,7 @@ describe("session.prompt fast", () => {
           seen = input
           return {
             info: {
-              id: Identifier.ascending("message"),
+              id: MessageID.ascending(),
               sessionID: input.sessionID,
             },
             parts: [],
@@ -377,7 +377,7 @@ describe("session.prompt fast", () => {
         const parent = await SessionPrompt.prompt({
           sessionID: session.id,
           agent: "build",
-          model: { providerID: "openai", modelID: "gpt-5.4" },
+          model: { providerID: ProviderID.openai, modelID: ModelID.make("gpt-5.4") },
           noReply: true,
           parts: [{ type: "text", text: "parent" }],
         })
@@ -385,7 +385,7 @@ describe("session.prompt fast", () => {
         if (parent.info.role !== "user") throw new Error("expected user message")
 
         const assistant = await Session.updateMessage({
-          id: Identifier.ascending("message"),
+          id: MessageID.ascending(),
           sessionID: session.id,
           parentID: parent.info.id,
           role: "assistant",
@@ -405,8 +405,8 @@ describe("session.prompt fast", () => {
             reasoning: 0,
             cache: { read: 0, write: 0 },
           },
-          modelID: "gpt-5.4",
-          providerID: "openai",
+          modelID: ModelID.make("gpt-5.4"),
+          providerID: ProviderID.openai,
         })
 
         const original = SessionPrompt.prompt

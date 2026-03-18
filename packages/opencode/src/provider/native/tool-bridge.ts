@@ -7,6 +7,7 @@ import { ToolRegistry } from "../../tool/registry"
 import { MCP } from "../../mcp"
 import { Tool } from "../../tool/tool"
 import { MessageV2 } from "../../session/message-v2"
+import { MessageID, PartID, SessionID } from "../../session/schema"
 import { Session } from "../../session"
 import { Agent } from "../../agent/agent"
 import { PermissionNext } from "../../permission/next"
@@ -16,6 +17,7 @@ import * as ToolMetadataRegistry from "./tool-metadata-registry"
 import { Identifier } from "../../id/id"
 import { Bus } from "../../bus"
 import { Log } from "../../util/log"
+import { ModelID } from "../schema"
 
 const log = Log.create({ service: "tool-bridge" })
 
@@ -87,7 +89,7 @@ async function flushBuffer(key: string) {
 }
 
 async function tryApplyUpdate(update: PendingUpdate): Promise<boolean> {
-  const parts = await MessageV2.parts(update.messageID)
+  const parts = await MessageV2.parts(MessageID.make(update.messageID))
   const match = parts.find((p): p is MessageV2.ToolPart => p.type === "tool" && p.callID === update.callID)
 
   if (!match) return false
@@ -281,7 +283,7 @@ export async function createOpenCodeToolsServer(context: ToolBridgeContext) {
   const toolContext = await resolveToolContext(context)
   const tools: Array<SdkMcpToolDefinition<any>> = []
   const registryTools = await ToolRegistry.tools(
-    { modelID: context.model.api.id, providerID: context.model.providerID },
+    { modelID: ModelID.make(context.model.api.id), providerID: context.model.providerID },
     toolContext.agent,
   )
 
@@ -443,7 +445,7 @@ async function resolveToolContext(context: ToolBridgeContext): Promise<ToolConte
     if (message) {
       const agentName = message.info.agent
       const agent = await Agent.get(agentName)
-      const session = await Session.get(context.sessionID).catch(() => undefined)
+      const session = await Session.get(SessionID.make(context.sessionID)).catch(() => undefined)
       return {
         messageID: message.info.id,
         agentName,
@@ -454,7 +456,7 @@ async function resolveToolContext(context: ToolBridgeContext): Promise<ToolConte
   }
 
   // Fallback: return minimal context (tools will still work, just without full session tracking)
-  const messageID = context.messageID ?? generateId()
+  const messageID = context.messageID ?? MessageID.ascending()
   return {
     messageID,
     agentName: "default",
@@ -465,13 +467,16 @@ async function resolveToolContext(context: ToolBridgeContext): Promise<ToolConte
 
 async function resolveAssistantMessage(sessionID: string, messageID?: string) {
   if (messageID) {
-    const msg = await MessageV2.get({ sessionID, messageID }).catch(() => undefined)
+    const msg = await MessageV2.get({
+      sessionID: SessionID.make(sessionID),
+      messageID: MessageID.make(messageID),
+    }).catch(() => undefined)
     if (msg && msg.info.role === "assistant") return msg
   }
 
   // Find the MOST RECENT assistant message (not the oldest)
   let lastAssistant: Awaited<ReturnType<typeof MessageV2.get>> | undefined
-  for await (const msg of MessageV2.stream(sessionID)) {
+  for await (const msg of MessageV2.stream(SessionID.make(sessionID))) {
     if (msg.info.role === "assistant") lastAssistant = msg
   }
 
@@ -489,17 +494,17 @@ async function buildToolContext(
   log.info("buildToolContext", { toolName, callID, hasCallID: !!callID, messageID: state.messageID })
   const abort = readAbortSignal(extra) ?? context.abort ?? new AbortController().signal
   const ruleset = PermissionNext.merge(state.agent?.permission ?? [], state.session?.permission ?? [])
-  const tool = callID ? { messageID: state.messageID, callID } : undefined
+  const tool = callID ? { messageID: MessageID.make(state.messageID), callID } : undefined
 
   // Fetch messages for context
   const messages: MessageV2.WithParts[] = []
-  for await (const msg of MessageV2.stream(context.sessionID)) {
+  for await (const msg of MessageV2.stream(SessionID.make(context.sessionID))) {
     messages.push(msg)
   }
 
   return {
-    sessionID: context.sessionID,
-    messageID: state.messageID,
+    sessionID: SessionID.make(context.sessionID),
+    messageID: MessageID.make(state.messageID),
     agent: state.agentName,
     abort,
     callID,
@@ -522,7 +527,7 @@ async function buildToolContext(
     ask: async (req) => {
       await PermissionNext.ask({
         ...req,
-        sessionID: context.sessionID,
+        sessionID: SessionID.make(context.sessionID),
         tool,
         ruleset,
       })
@@ -541,7 +546,7 @@ async function ensureToolPartExists(input: {
   input: Record<string, unknown>
 }): Promise<MessageV2.ToolPart | undefined> {
   // Check if part already exists
-  const parts = await MessageV2.parts(input.messageID)
+  const parts = await MessageV2.parts(MessageID.make(input.messageID))
   const existing = parts.find((p): p is MessageV2.ToolPart => p.type === "tool" && p.callID === input.callID)
 
   if (existing) {
@@ -563,9 +568,9 @@ async function ensureToolPartExists(input: {
 
   // Create new part in running state
   const part: MessageV2.ToolPart = {
-    id: Identifier.ascending("part"),
-    sessionID: input.sessionID,
-    messageID: input.messageID,
+    id: PartID.ascending(),
+    sessionID: SessionID.make(input.sessionID),
+    messageID: MessageID.make(input.messageID),
     type: "tool",
     tool: input.toolName,
     callID: input.callID,
@@ -597,7 +602,7 @@ async function updateToolMetadata(input: UpdateInput) {
   log.info("updateToolMetadata called", { sessionID, messageID, callID, toolName, hasMetadata: !!val.metadata })
 
   // Try to update existing part
-  const parts = await MessageV2.parts(messageID)
+  const parts = await MessageV2.parts(MessageID.make(messageID))
   log.info("updateToolMetadata parts query", {
     messageID,
     partCount: parts.length,
