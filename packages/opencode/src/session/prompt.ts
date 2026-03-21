@@ -111,6 +111,7 @@ export namespace SessionPrompt {
     format: MessageV2.Format.optional(),
     system: z.string().optional(),
     variant: z.string().optional(),
+    fast: z.boolean().optional(),
     parts: z.array(
       z.discriminatedUnion("type", [
         MessageV2.TextPart.omit({
@@ -513,6 +514,7 @@ export namespace SessionPrompt {
             },
             agent: lastUser.agent,
             model: lastUser.model,
+            fast: lastUser.fast,
           }
           await Session.updateMessage(summaryUserMsg)
           await Session.updatePart({
@@ -543,16 +545,22 @@ export namespace SessionPrompt {
       }
 
       // context overflow, needs compaction
+      const forceCompaction = Boolean(session.parentID)
       if (
         lastFinished &&
         lastFinished.summary !== true &&
-        (await SessionCompaction.isOverflow({ tokens: lastFinished.tokens, model }))
+        (await SessionCompaction.isOverflow({
+          tokens: lastFinished.tokens,
+          model,
+          force: forceCompaction,
+        }))
       ) {
         await SessionCompaction.create({
           sessionID,
           agent: lastUser.agent,
           model: lastUser.model,
           auto: true,
+          fast: lastUser.fast,
         })
         continue
       }
@@ -596,6 +604,7 @@ export namespace SessionPrompt {
         sessionID: sessionID,
         model,
         abort,
+        forceCompaction,
       })
       using _ = defer(() => InstructionPrompt.clear(processor.message.id))
 
@@ -718,19 +727,23 @@ export namespace SessionPrompt {
           model: lastUser.model,
           auto: true,
           overflow: !processor.message.finish,
+          fast: lastUser.fast,
         })
       }
       continue
     }
+    log.info("loop exited while", { sessionID })
     SessionCompaction.prune({ sessionID })
     for await (const item of MessageV2.stream(sessionID)) {
       if (item.info.role === "user") continue
       const queued = state()[sessionID]?.callbacks ?? []
+      log.info("loop returning item", { sessionID, role: item.info.role, queued: queued.length })
       for (const q of queued) {
         q.resolve(item)
       }
       return item
     }
+    log.error("loop fell through - no assistant message found", { sessionID })
     throw new Error("Impossible")
   })
 
@@ -963,15 +976,17 @@ export namespace SessionPrompt {
   }
 
   async function createUserMessage(input: PromptInput) {
-    const agent = await Agent.get(input.agent ?? (await Agent.defaultAgent()))
+    // Handle both undefined and empty string cases for agent
+    const agentName = input.agent || (await Agent.defaultAgent())
+    const agent = await Agent.get(agentName)
 
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
+    const fast = input.fast ?? agent.fast
     const full =
       !input.variant && agent.variant
         ? await Provider.getModel(model.providerID, model.modelID).catch(() => undefined)
         : undefined
     const variant = input.variant ?? (agent.variant && full?.variants?.[agent.variant] ? agent.variant : undefined)
-
     const info: MessageV2.Info = {
       id: input.messageID ?? MessageID.ascending(),
       role: "user",
@@ -985,6 +1000,7 @@ export namespace SessionPrompt {
       system: input.system,
       format: input.format,
       variant,
+      fast,
     }
     using _ = defer(() => InstructionPrompt.clear(info.id))
 
@@ -1503,6 +1519,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         modelID: ModelID.zod,
       })
       .optional(),
+    fast: z.boolean().optional(),
     command: z.string(),
   })
   export type ShellInput = z.infer<typeof ShellInput>
@@ -1530,7 +1547,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       await SessionRevert.cleanup(session)
     }
     const agent = await Agent.get(input.agent)
+    if (!agent) {
+      throw new Error(`Agent not found: ${input.agent}`)
+    }
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
+    const fast = input.fast ?? agent.fast
     const userMsg: MessageV2.User = {
       id: MessageID.ascending(),
       sessionID: input.sessionID,
@@ -1543,6 +1564,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         providerID: model.providerID,
         modelID: model.modelID,
       },
+      fast,
     }
     await Session.updateMessage(userMsg)
     const userPart: MessageV2.Part = {
@@ -1753,6 +1775,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     arguments: z.string(),
     command: z.string(),
     variant: z.string().optional(),
+    fast: z.boolean().optional(),
     parts: z
       .array(
         z.discriminatedUnion("type", [
@@ -1781,7 +1804,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
   export async function command(input: CommandInput) {
     log.info("command", input)
     const command = await Command.get(input.command)
-    const agentName = command.agent ?? input.agent ?? (await Agent.defaultAgent())
+    // Use || to handle both undefined and empty string cases
+    const agentName = command.agent || input.agent || (await Agent.defaultAgent())
 
     const raw = input.arguments.match(argsRegex) ?? []
     const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
@@ -1910,6 +1934,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       agent: userAgent,
       parts,
       variant: input.variant,
+      fast: input.fast,
     })) as MessageV2.WithParts
 
     Bus.publish(Command.Event.Executed, {

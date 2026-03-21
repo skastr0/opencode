@@ -1,0 +1,9 @@
+You are creating a brief handoff summary to transfer context to a new AI session.
+
+The full session skeleton and file lists will be included automatically - you do NOT need to repeat them.
+
+Your task is to provide a BRIEF (2-4 sentences) summary covering:
+1. Current state - what's working and what's not
+2. Immediate next action - what should be done first
+
+Be specific about technical details but keep it concise. The detailed conversation history is preserved in the session file referenced above.

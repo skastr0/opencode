@@ -14,7 +14,12 @@ export type SessionRoute = {
   initialPrompt?: PromptInfo
 }
 
-export type Route = HomeRoute | SessionRoute
+export type ChangesRoute = {
+  type: "changes"
+  returnTo?: HomeRoute | SessionRoute
+}
+
+export type Route = HomeRoute | SessionRoute | ChangesRoute
 
 export const { use: useRoute, provider: RouteProvider } = createSimpleContext({
   name: "Route",
@@ -32,7 +37,6 @@ export const { use: useRoute, provider: RouteProvider } = createSimpleContext({
         return store
       },
       navigate(route: Route) {
-        console.log("navigate", route)
         setStore(route)
       },
     }

@@ -279,15 +279,17 @@ export const SessionRoutes = lazy(() =>
         const sessionID = c.req.valid("param").sessionID
         const updates = c.req.valid("json")
 
-        let session = await Session.get(sessionID)
+        const unchanged = updates.title === undefined && updates.time?.archived === undefined
+        if (unchanged) return c.json(await Session.get(sessionID))
+
         if (updates.title !== undefined) {
-          session = await Session.setTitle({ sessionID, title: updates.title })
+          await Session.setTitle({ sessionID, title: updates.title })
         }
         if (updates.time?.archived !== undefined) {
-          session = await Session.setArchived({ sessionID, time: updates.time.archived })
+          await Session.setArchived({ sessionID, time: updates.time.archived })
         }
 
-        return c.json(session)
+        return c.json(await Session.get(sessionID))
       },
     )
     .post(

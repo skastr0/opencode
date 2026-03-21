@@ -1,5 +1,5 @@
 import { useSync } from "@tui/context/sync"
-import { createMemo, For, Show, Switch, Match } from "solid-js"
+import { createMemo, createSignal, createEffect, For, Show, Switch, Match, on } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useTheme } from "../../context/theme"
 import { Locale } from "@/util/locale"
@@ -11,6 +11,7 @@ import { useKeybind } from "../../context/keybind"
 import { useDirectory } from "../../context/directory"
 import { useKV } from "../../context/kv"
 import { TodoItem } from "../../component/todo-item"
+import { ProviderQuota, type QuotaInfo } from "@/provider/quota"
 
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const sync = useSync()
@@ -60,6 +61,19 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     }
   })
 
+  const transport = createMemo(() => {
+    const last = messages().findLast((x) => x.role === "assistant") as AssistantMessage | undefined
+    if (!last) return "unknown"
+    const parts = sync.data.part[last.id] ?? []
+    const value = [...parts]
+      .reverse()
+      .map((part: any) => part?.metadata?.openai?.transport)
+      .find((item) => item === "websocket" || item === "http")
+    if (value === "websocket") return "ws"
+    if (value === "http") return "http"
+    return "unknown"
+  })
+
   const directory = useDirectory()
   const kv = useKV()
 
@@ -67,6 +81,47 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     sync.data.provider.some((x) => x.id !== "opencode" || Object.values(x.models).some((y) => y.cost?.input !== 0)),
   )
   const gettingStartedDismissed = createMemo(() => kv.get("dismissed_getting_started", false))
+
+  // Quota widget state
+  const activeProvider = createMemo(() => {
+    const last = messages().findLast((x) => x.role === "assistant") as AssistantMessage | undefined
+    return last?.providerID
+  })
+
+  const [quota, setQuota] = createSignal<QuotaInfo | null | "loading">("loading")
+
+  createEffect(
+    on([activeProvider, () => messages().length], async () => {
+      const provider = activeProvider()
+      if (!provider) {
+        setQuota(null)
+        return
+      }
+      setQuota("loading")
+      const info = await ProviderQuota.fetchCached(provider)
+      setQuota(info)
+    }),
+  )
+
+  const quotaColor = createMemo(() => {
+    const q = quota()
+    if (q === "loading" || !q || q.remaining === undefined) return theme.textMuted
+    if (q.remaining > 50) return theme.success
+    if (q.remaining > 20) return theme.warning
+    return theme.error
+  })
+
+  const relativeTime = (date: Date) => {
+    const diff = date.getTime() - Date.now()
+    if (diff <= 0) return "now"
+    const mins = Math.floor(diff / 60000)
+    const hours = Math.floor(mins / 60)
+    const remaining = mins % 60
+    return hours > 0 ? `${hours}h ${remaining}m` : `${mins}m`
+  }
+
+  const currency = (value: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
 
   return (
     <Show when={session()}>
@@ -104,8 +159,49 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
               </text>
               <text fg={theme.textMuted}>{context()?.tokens ?? 0} tokens</text>
               <text fg={theme.textMuted}>{context()?.percentage ?? 0}% used</text>
+              <text fg={theme.textMuted}>transport: {transport()}</text>
               <text fg={theme.textMuted}>{cost()} spent</text>
             </box>
+            <Show when={quota() !== null}>
+              <box>
+                <text fg={theme.text}>
+                  <b>Quota</b>
+                </text>
+                <Switch>
+                  <Match when={quota() === "loading"}>
+                    <text fg={theme.textMuted}>...</text>
+                  </Match>
+                  <Match when={quota() && quota() !== "loading"}>
+                    {(() => {
+                      const q = quota() as QuotaInfo
+                      const provider = sync.data.provider.find((x) => x.id === activeProvider())
+                      const name = provider?.name ?? activeProvider()
+                      return (
+                        <>
+                          <Show when={q.type === "quota-based" && q.remaining !== undefined}>
+                            <text fg={quotaColor()}>
+                              {name}: {Math.round(q.remaining!)}% remaining
+                            </text>
+                          </Show>
+                          <Show when={q.resetsAt}>
+                            <text fg={theme.textMuted}>resets {relativeTime(q.resetsAt!)}</text>
+                          </Show>
+                          <Show when={q.type === "pay-as-you-go" && q.weeklyUsed !== undefined}>
+                            <text fg={theme.textMuted}>
+                              Weekly: {currency(q.weeklyUsed!)}
+                              {q.weeklyLimit !== undefined ? ` / ${currency(q.weeklyLimit)}` : ""}
+                            </text>
+                          </Show>
+                          <Show when={q.type === "pay-as-you-go" && q.totalCredits !== undefined}>
+                            <text fg={theme.textMuted}>Credits: {currency(q.totalCredits!)}</text>
+                          </Show>
+                        </>
+                      )
+                    })()}
+                  </Match>
+                </Switch>
+              </box>
+            </Show>
             <Show when={mcpEntries().length > 0}>
               <box>
                 <box

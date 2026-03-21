@@ -87,4 +87,17 @@ describe("Session.list", () => {
       },
     })
   })
+
+  test("does not apply implicit 100-session limit", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const prefix = `no-implicit-limit-${Date.now()}-`
+        await Promise.all(Array.from({ length: 110 }, (_, i) => Session.create({ title: `${prefix}${i}` })))
+
+        const sessions = [...Session.list({ search: prefix })]
+        expect(sessions.length).toBe(110)
+      },
+    })
+  })
 })

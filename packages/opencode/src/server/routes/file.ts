@@ -164,11 +164,12 @@ export const FileRoutes = lazy(() =>
         "query",
         z.object({
           path: z.string(),
+          stage: z.enum(["staged", "unstaged"]).optional(),
         }),
       ),
       async (c) => {
-        const path = c.req.valid("query").path
-        const content = await File.read(path)
+        const query = c.req.valid("query")
+        const content = await File.read(query.path, query.stage)
         return c.json(content)
       },
     )

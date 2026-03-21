@@ -30,15 +30,21 @@ export namespace SessionCompaction {
 
   const COMPACTION_BUFFER = 20_000
 
-  export async function isOverflow(input: { tokens: MessageV2.Assistant["tokens"]; model: Provider.Model }) {
+  export async function isOverflow(input: {
+    tokens: MessageV2.Assistant["tokens"]
+    model: Provider.Model
+    force?: boolean
+  }) {
     const config = await Config.get()
-    if (config.compaction?.auto === false) return false
+    if (!input.force && config.compaction?.auto === false) return false
     const context = input.model.limit.context
     if (context === 0) return false
 
-    const count =
-      input.tokens.total ||
-      input.tokens.input + input.tokens.output + input.tokens.cache.read + input.tokens.cache.write
+    const fallback = input.tokens.input + input.tokens.output + input.tokens.cache.read + input.tokens.cache.write
+    const codex = input.model.providerID === "openai" && input.model.id.includes("codex")
+    const count = codex
+      ? Math.max(input.tokens.total ?? 0, fallback + input.tokens.reasoning)
+      : input.tokens.total || fallback
 
     const reserved =
       config.compaction?.reserved ?? Math.min(COMPACTION_BUFFER, ProviderTransform.maxOutputTokens(input.model))
@@ -130,6 +136,11 @@ export namespace SessionCompaction {
     }
 
     const agent = await Agent.get("compaction")
+    // If compaction agent is disabled, skip compaction and continue the loop
+    if (!agent) {
+      log.info("compaction agent disabled, skipping compaction")
+      return "stop" as const
+    }
     const model = agent.model
       ? await Provider.getModel(agent.model.providerID, agent.model.modelID)
       : await Provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
@@ -249,6 +260,7 @@ When constructing the summary, try to stick to this template:
           tools: original.tools,
           system: original.system,
           variant: original.variant,
+          fast: original.fast,
         })
         for (const part of replay.parts) {
           if (part.type === "compaction") continue
@@ -271,6 +283,7 @@ When constructing the summary, try to stick to this template:
           time: { created: Date.now() },
           agent: userMessage.agent,
           model: userMessage.model,
+          fast: userMessage.fast,
         })
         const text =
           (input.overflow
@@ -306,6 +319,7 @@ When constructing the summary, try to stick to this template:
       }),
       auto: z.boolean(),
       overflow: z.boolean().optional(),
+      fast: z.boolean().optional(),
     }),
     async (input) => {
       const msg = await Session.updateMessage({
@@ -314,6 +328,7 @@ When constructing the summary, try to stick to this template:
         model: input.model,
         sessionID: input.sessionID,
         agent: input.agent,
+        fast: input.fast,
         time: {
           created: Date.now(),
         },

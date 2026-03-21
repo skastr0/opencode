@@ -61,6 +61,8 @@ import { DialogConfirm } from "@tui/ui/dialog-confirm"
 import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
+import { DialogHandoff } from "../../component/dialog-handoff"
+import { HandoffBanner } from "../../component/handoff-banner"
 import { Sidebar } from "./sidebar"
 import { Flag } from "@/flag/flag"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
@@ -121,7 +123,7 @@ export function Session() {
   const kv = useKV()
   const { theme } = useTheme()
   const promptRef = usePromptRef()
-  const session = createMemo(() => sync.session.get(route.sessionID))
+  const session = createMemo(() => sync.session.get(route.sessionID)!)
   const children = createMemo(() => {
     const parentID = session()?.parentID ?? session()?.id
     return sync.data.session
@@ -130,7 +132,9 @@ export function Session() {
   })
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
   const permissions = createMemo(() => {
-    if (session()?.parentID) return []
+    const s = session()
+    if (!s) return []
+    if (s.parentID) return sync.data.permission[route.sessionID] ?? []
     return children().flatMap((x) => sync.data.permission[x.id] ?? [])
   })
   const questions = createMemo(() => {
@@ -143,7 +147,7 @@ export function Session() {
   })
 
   const lastAssistant = createMemo(() => {
-    return messages().findLast((x) => x.role === "assistant")
+    return messages().findLast((x) => x.role === "assistant" && x.agent !== "compaction")
   })
 
   const dimensions = useTerminalDimensions()
@@ -189,8 +193,9 @@ export function Session() {
   })
 
   createEffect(async () => {
+    // Force sync on navigation to ensure fresh data for the new session
     await sync.session
-      .sync(route.sessionID)
+      .sync(route.sessionID, { force: true })
       .then(() => {
         if (scroll) scroll.scrollBy(100_000)
       })
@@ -477,6 +482,15 @@ export function Session() {
       },
     },
     {
+      title: "Handoff session",
+      value: "session.handoff",
+      keybind: "session_handoff",
+      category: "Session",
+      onSelect: (dialog) => {
+        dialog.replace(() => <DialogHandoff sessionID={route.sessionID} />)
+      },
+    },
+    {
       title: "Unshare session",
       value: "session.unshare",
       keybind: "session_unshare",
@@ -511,7 +525,7 @@ export function Session() {
       onSelect: async (dialog) => {
         const status = sync.data.session_status?.[route.sessionID]
         if (status?.type !== "idle") await sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => {})
-        const revert = session()?.revert?.messageID
+        const revert = session().revert?.messageID
         const message = messages().findLast((x) => (!revert || x.id < revert) && x.role === "user")
         if (!message) return
         sdk.client.session
@@ -549,7 +563,7 @@ export function Session() {
       },
       onSelect: (dialog) => {
         dialog.clear()
-        const messageID = session()?.revert?.messageID
+        const messageID = session().revert?.messageID
         if (!messageID) return
         const message = messages().find((x) => x.role === "user" && x.id > messageID)
         if (!message) {
@@ -843,7 +857,6 @@ export function Session() {
       onSelect: async (dialog) => {
         try {
           const sessionData = session()
-          if (!sessionData) return
           const sessionMessages = messages()
           const transcript = formatTranscript(
             sessionData,
@@ -873,7 +886,6 @@ export function Session() {
       onSelect: async (dialog) => {
         try {
           const sessionData = session()
-          if (!sessionData) return
           const sessionMessages = messages()
 
           const defaultFilename = `session-${sessionData.id.slice(0, 8)}.md`
@@ -1069,101 +1081,105 @@ export function Session() {
               flexGrow={1}
               scrollAcceleration={scrollAcceleration()}
             >
-              <For each={messages()}>
-                {(message, index) => (
-                  <Switch>
-                    <Match when={message.id === revert()?.messageID}>
-                      {(function () {
-                        const command = useCommandDialog()
-                        const [hover, setHover] = createSignal(false)
-                        const dialog = useDialog()
+              <Show when={route.sessionID} keyed>
+                {(sessionID) => (
+                  <For each={sync.data.message[sessionID] ?? []}>
+                    {(message, index) => (
+                      <Switch>
+                        <Match when={message.id === revert()?.messageID}>
+                          {(function () {
+                            const command = useCommandDialog()
+                            const [hover, setHover] = createSignal(false)
+                            const dialog = useDialog()
 
-                        const handleUnrevert = async () => {
-                          const confirmed = await DialogConfirm.show(
-                            dialog,
-                            "Confirm Redo",
-                            "Are you sure you want to restore the reverted messages?",
-                          )
-                          if (confirmed) {
-                            command.trigger("session.redo")
-                          }
-                        }
+                            const handleUnrevert = async () => {
+                              const confirmed = await DialogConfirm.show(
+                                dialog,
+                                "Confirm Redo",
+                                "Are you sure you want to restore the reverted messages?",
+                              )
+                              if (confirmed) {
+                                command.trigger("session.redo")
+                              }
+                            }
 
-                        return (
-                          <box
-                            onMouseOver={() => setHover(true)}
-                            onMouseOut={() => setHover(false)}
-                            onMouseUp={handleUnrevert}
-                            marginTop={1}
-                            flexShrink={0}
-                            border={["left"]}
-                            customBorderChars={SplitBorder.customBorderChars}
-                            borderColor={theme.backgroundPanel}
-                          >
-                            <box
-                              paddingTop={1}
-                              paddingBottom={1}
-                              paddingLeft={2}
-                              backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
-                            >
-                              <text fg={theme.textMuted}>{revert()!.reverted.length} message reverted</text>
-                              <text fg={theme.textMuted}>
-                                <span style={{ fg: theme.text }}>{keybind.print("messages_redo")}</span> or /redo to
-                                restore
-                              </text>
-                              <Show when={revert()!.diffFiles?.length}>
-                                <box marginTop={1}>
-                                  <For each={revert()!.diffFiles}>
-                                    {(file) => (
-                                      <text fg={theme.text}>
-                                        {file.filename}
-                                        <Show when={file.additions > 0}>
-                                          <span style={{ fg: theme.diffAdded }}> +{file.additions}</span>
-                                        </Show>
-                                        <Show when={file.deletions > 0}>
-                                          <span style={{ fg: theme.diffRemoved }}> -{file.deletions}</span>
-                                        </Show>
-                                      </text>
-                                    )}
-                                  </For>
+                            return (
+                              <box
+                                onMouseOver={() => setHover(true)}
+                                onMouseOut={() => setHover(false)}
+                                onMouseUp={handleUnrevert}
+                                marginTop={1}
+                                flexShrink={0}
+                                border={["left"]}
+                                customBorderChars={SplitBorder.customBorderChars}
+                                borderColor={theme.backgroundPanel}
+                              >
+                                <box
+                                  paddingTop={1}
+                                  paddingBottom={1}
+                                  paddingLeft={2}
+                                  backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
+                                >
+                                  <text fg={theme.textMuted}>{revert()!.reverted.length} message reverted</text>
+                                  <text fg={theme.textMuted}>
+                                    <span style={{ fg: theme.text }}>{keybind.print("messages_redo")}</span> or /redo to
+                                    restore
+                                  </text>
+                                  <Show when={revert()!.diffFiles?.length}>
+                                    <box marginTop={1}>
+                                      <For each={revert()!.diffFiles}>
+                                        {(file) => (
+                                          <text fg={theme.text}>
+                                            {file.filename}
+                                            <Show when={file.additions > 0}>
+                                              <span style={{ fg: theme.diffAdded }}> +{file.additions}</span>
+                                            </Show>
+                                            <Show when={file.deletions > 0}>
+                                              <span style={{ fg: theme.diffRemoved }}> -{file.deletions}</span>
+                                            </Show>
+                                          </text>
+                                        )}
+                                      </For>
+                                    </box>
+                                  </Show>
                                 </box>
-                              </Show>
-                            </box>
-                          </box>
-                        )
-                      })()}
-                    </Match>
-                    <Match when={revert()?.messageID && message.id >= revert()!.messageID}>
-                      <></>
-                    </Match>
-                    <Match when={message.role === "user"}>
-                      <UserMessage
-                        index={index()}
-                        onMouseUp={() => {
-                          if (renderer.getSelection()?.getSelectedText()) return
-                          dialog.replace(() => (
-                            <DialogMessage
-                              messageID={message.id}
-                              sessionID={route.sessionID}
-                              setPrompt={(promptInfo) => prompt.set(promptInfo)}
-                            />
-                          ))
-                        }}
-                        message={message as UserMessage}
-                        parts={sync.data.part[message.id] ?? []}
-                        pending={pending()}
-                      />
-                    </Match>
-                    <Match when={message.role === "assistant"}>
-                      <AssistantMessage
-                        last={lastAssistant()?.id === message.id}
-                        message={message as AssistantMessage}
-                        parts={sync.data.part[message.id] ?? []}
-                      />
-                    </Match>
-                  </Switch>
+                              </box>
+                            )
+                          })()}
+                        </Match>
+                        <Match when={revert()?.messageID && message.id >= revert()!.messageID}>
+                          <></>
+                        </Match>
+                        <Match when={message.role === "user"}>
+                          <UserMessage
+                            index={index()}
+                            onMouseUp={() => {
+                              if (renderer.getSelection()?.getSelectedText()) return
+                              dialog.replace(() => (
+                                <DialogMessage
+                                  messageID={message.id}
+                                  sessionID={route.sessionID}
+                                  setPrompt={(promptInfo) => prompt.set(promptInfo)}
+                                />
+                              ))
+                            }}
+                            message={message as UserMessage}
+                            parts={sync.data.part[message.id] ?? []}
+                            pending={pending()}
+                          />
+                        </Match>
+                        <Match when={message.role === "assistant"}>
+                          <AssistantMessage
+                            last={lastAssistant()?.id === message.id}
+                            message={message as AssistantMessage}
+                            parts={sync.data.part[message.id] ?? []}
+                          />
+                        </Match>
+                      </Switch>
+                    )}
+                  </For>
                 )}
-              </For>
+              </Show>
             </scrollbox>
             <box flexShrink={0}>
               <Show when={permissions().length > 0}>
@@ -1173,7 +1189,7 @@ export function Session() {
                 <QuestionPrompt request={questions()[0]} />
               </Show>
               <Prompt
-                visible={!session()?.parentID && permissions().length === 0 && questions().length === 0}
+                visible={!session().parentID && permissions().length === 0}
                 ref={(r) => {
                   prompt = r
                   promptRef.set(r)
@@ -1237,6 +1253,14 @@ function UserMessage(props: {
   const ctx = use()
   const local = useLocal()
   const text = createMemo(() => props.parts.flatMap((x) => (x.type === "text" && !x.synthetic ? [x] : []))[0])
+  const handoff = createMemo(() => {
+    if (props.index !== 0) return undefined
+    const textParts = props.parts.filter((part): part is TextPart => part.type === "text")
+    const syntheticText = textParts.find((part) => part.synthetic)
+    const nonSyntheticText = textParts.find((part) => !part.synthetic)
+    if (syntheticText && !nonSyntheticText) return syntheticText.text
+    return undefined
+  })
   const files = createMemo(() => props.parts.flatMap((x) => (x.type === "file" ? [x] : [])))
   const sync = useSync()
   const { theme } = useTheme()
@@ -1250,6 +1274,7 @@ function UserMessage(props: {
 
   return (
     <>
+      <Show when={handoff()}>{(summary) => <HandoffBanner summary={summary()} />}</Show>
       <Show when={text()}>
         <box
           id={props.message.id}
@@ -1986,7 +2011,7 @@ function Task(props: ToolProps<typeof TaskTool>) {
     return messages().flatMap((msg) =>
       (sync.data.part[msg.id] ?? [])
         .filter((part): part is ToolPart => part.type === "tool")
-        .map((part) => ({ tool: part.tool, state: part.state })),
+        .map((part) => ({ tool: part.tool, state: part.state, isSubagent: part.tool === "task" })),
     )
   })
 
@@ -2019,20 +2044,53 @@ function Task(props: ToolProps<typeof TaskTool>) {
   })
 
   return (
-    <InlineTool
-      icon="│"
-      spinner={isRunning()}
-      complete={props.input.description}
-      pending="Delegating..."
-      part={props.part}
-      onClick={() => {
-        if (props.metadata.sessionId) {
-          navigate({ type: "session", sessionID: props.metadata.sessionId })
-        }
-      }}
-    >
-      {content()}
-    </InlineTool>
+    <Switch>
+      <Match when={props.input.description || props.input.subagent_type}>
+        <BlockTool
+          title={"# " + Locale.titlecase(props.input.subagent_type ?? "unknown") + " Task"}
+          onClick={
+            props.metadata.sessionId
+              ? () => navigate({ type: "session", sessionID: props.metadata.sessionId! })
+              : undefined
+          }
+          part={props.part}
+          spinner={isRunning()}
+        >
+          <box>
+            <text style={{ fg: theme.textMuted }}>
+              {props.input.description} ({tools().length} toolcalls)
+            </text>
+            <Show when={current()}>
+              {(item) => {
+                const task = item()
+                const title = task.state.status === "completed" ? (task.state as any).title : ""
+                const marker = task.isSubagent ? "○" : ""
+                const suffix = task.isSubagent ? " [subagent]" : ""
+                return (
+                  <text style={{ fg: task.state.status === "error" ? theme.error : theme.textMuted }}>
+                    └ {marker}
+                    {marker ? " " : ""}
+                    {Locale.titlecase(task.tool)} {title}
+                    {suffix}
+                  </text>
+                )
+              }}
+            </Show>
+          </box>
+          <Show when={props.metadata.sessionId}>
+            <text fg={theme.text}>
+              {keybind.print("session_child_first")}
+              <span style={{ fg: theme.textMuted }}> view subagents</span>
+            </text>
+          </Show>
+        </BlockTool>
+      </Match>
+      <Match when={true}>
+        <InlineTool icon="#" pending="Delegating..." complete={props.input.subagent_type} part={props.part}>
+          {props.input.subagent_type} Task {props.input.description}
+        </InlineTool>
+      </Match>
+    </Switch>
   )
 }
 
@@ -2049,11 +2107,33 @@ function Edit(props: ToolProps<typeof EditTool>) {
 
   const ft = createMemo(() => filetype(props.input.filePath))
 
-  const diffContent = createMemo(() => props.metadata.diff)
+  // Use metadata.diff if available, otherwise generate from input oldString/newString
+  // (SDK native Edit calls don't have metadata.diff, but do have the input strings)
+  const diffContent = createMemo(() => {
+    if (props.metadata.diff) return props.metadata.diff
+    // Generate unified diff from oldString/newString for SDK native tools
+    const oldStr = props.input.oldString
+    const newStr = props.input.newString
+    if (oldStr !== undefined && newStr !== undefined) {
+      // Create a simple unified diff format
+      const oldLines = oldStr.split("\n")
+      const newLines = newStr.split("\n")
+      const hunks: string[] = []
+      hunks.push(`@@ -1,${oldLines.length} +1,${newLines.length} @@`)
+      for (const line of oldLines) {
+        hunks.push(`-${line}`)
+      }
+      for (const line of newLines) {
+        hunks.push(`+${line}`)
+      }
+      return hunks.join("\n")
+    }
+    return undefined
+  })
 
   return (
     <Switch>
-      <Match when={props.metadata.diff !== undefined}>
+      <Match when={diffContent() !== undefined}>
         <BlockTool title={"← Edit " + normalizePath(props.input.filePath!)} part={props.part}>
           <box paddingLeft={1}>
             <diff

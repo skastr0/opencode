@@ -23,6 +23,7 @@ import { DialogSessionList } from "@tui/component/dialog-session-list"
 import { DialogWorkspaceList } from "@tui/component/dialog-workspace-list"
 import { KeybindProvider } from "@tui/context/keybind"
 import { ThemeProvider, useTheme } from "@tui/context/theme"
+import { Changes } from "@tui/routes/changes"
 import { Home } from "@tui/routes/home"
 import { Session } from "@tui/routes/session"
 import { PromptHistoryProvider } from "./component/prompt/history"
@@ -256,10 +257,6 @@ function App() {
   }
   const [terminalTitleEnabled, setTerminalTitleEnabled] = createSignal(kv.get("terminal_title_enabled", true))
 
-  createEffect(() => {
-    console.log(JSON.stringify(route.data))
-  })
-
   // Update terminal window title based on current route and session
   createEffect(() => {
     if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
@@ -279,6 +276,11 @@ function App() {
       // Truncate title to 40 chars max
       const title = session.title.length > 40 ? session.title.slice(0, 37) + "..." : session.title
       renderer.setTerminalTitle(`OC | ${title}`)
+      return
+    }
+
+    if (route.data.type === "changes") {
+      renderer.setTerminalTitle("OpenCode")
     }
   })
 
@@ -357,6 +359,51 @@ function App() {
   )
 
   const connected = useConnected()
+  type FastAction = "toggle" | "on" | "off" | "status"
+
+  function fast(action: FastAction) {
+    if (!local.model.current()) {
+      toast.show({
+        variant: "warning",
+        message: "Connect a provider to use fast mode",
+        duration: 3000,
+      })
+      return
+    }
+    const current = local.model.fast.current() === true
+    if (action === "status") {
+      toast.show({
+        variant: "info",
+        message: current ? "Fast mode is on" : "Fast mode is off",
+        duration: 3000,
+      })
+      return
+    }
+    const next = action === "toggle" ? local.model.fast.toggle() : action === "on"
+    if (action !== "toggle") local.model.fast.set(next)
+    toast.show({
+      variant: next ? "success" : "info",
+      message: next ? "Fast mode enabled" : "Fast mode disabled",
+      duration: 3000,
+    })
+  }
+
+  const returnTo = () => {
+    if (route.data.type === "home") {
+      if (!route.data.initialPrompt) return { type: "home" } as const
+      return { type: "home", initialPrompt: route.data.initialPrompt } as const
+    }
+    if (route.data.type === "session") {
+      if (!route.data.initialPrompt) return { type: "session", sessionID: route.data.sessionID } as const
+      return {
+        type: "session",
+        sessionID: route.data.sessionID,
+        initialPrompt: route.data.initialPrompt,
+      } as const
+    }
+    return route.data.returnTo ?? ({ type: "home" } as const)
+  }
+
   command.register(() => [
     {
       title: "Switch session",
@@ -408,6 +455,21 @@ function App() {
           type: "home",
           initialPrompt: currentPrompt,
           workspaceID,
+        })
+        dialog.clear()
+      },
+    },
+    {
+      title: "View changes",
+      value: "changes.view",
+      category: "Session",
+      slash: {
+        name: "changes",
+      },
+      onSelect: (dialog) => {
+        route.navigate({
+          type: "changes",
+          returnTo: returnTo(),
         })
         dialog.clear()
       },
@@ -506,6 +568,19 @@ function App() {
       hidden: true,
       onSelect: () => {
         local.model.variant.cycle()
+      },
+    },
+    {
+      title: local.model.fast.current() ? "Disable fast mode" : "Enable fast mode",
+      description: "toggle priority routing for supported Codex sessions",
+      value: "fast.toggle",
+      category: "Agent",
+      slash: {
+        name: "fast",
+      },
+      onSelect: (dialog) => {
+        fast("toggle")
+        dialog.clear()
       },
     },
     {
@@ -691,6 +766,7 @@ function App() {
   })
 
   sdk.event.on(TuiEvent.SessionSelect.type, (evt) => {
+    dialog.clear()
     route.navigate({
       type: "session",
       sessionID: evt.properties.sessionID,
@@ -759,6 +835,9 @@ function App() {
         </Match>
         <Match when={route.data.type === "session"}>
           <Session />
+        </Match>
+        <Match when={route.data.type === "changes"}>
+          <Changes />
         </Match>
       </Switch>
     </box>

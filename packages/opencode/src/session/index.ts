@@ -14,6 +14,7 @@ import type { SQL } from "../storage/db"
 import { SessionTable, MessageTable, PartTable } from "./session.sql"
 import { ProjectTable } from "../project/project.sql"
 import { Storage } from "@/storage/storage"
+import { Identifier } from "../id/id"
 import { Log } from "../util/log"
 import { MessageV2 } from "./message-v2"
 import { Instance } from "../project/instance"
@@ -127,6 +128,7 @@ export namespace Session {
       workspaceID: WorkspaceID.zod.optional(),
       directory: z.string(),
       parentID: SessionID.zod.optional(),
+      depth: z.number().optional().describe("Nesting depth of session (0 for root, increments for subagent sessions)"),
       summary: z
         .object({
           additions: z.number(),
@@ -294,6 +296,28 @@ export namespace Session {
     })
   })
 
+  export const depth = fn(SessionID.zod, async (sessionID) => {
+    const seen = new Set<SessionID>()
+    let id: SessionID | undefined = sessionID
+    let result = 0
+    while (id) {
+      if (seen.has(id)) break
+      seen.add(id)
+      const current: SessionID = id
+      const row: { parent_id: SessionID | null } | undefined = Database.use((db) =>
+        db
+          .select({ parent_id: SessionTable.parent_id })
+          .from(SessionTable)
+          .where(and(eq(SessionTable.project_id, Instance.project.id), eq(SessionTable.id, current)))
+          .get(),
+      )
+      if (!row) break
+      result += 1
+      id = row.parent_id ?? undefined
+    }
+    return Math.max(0, result - 1)
+  })
+
   export async function createNext(input: {
     id?: SessionID
     title?: string
@@ -302,6 +326,7 @@ export namespace Session {
     directory: string
     permission?: PermissionNext.Ruleset
   }) {
+    const level = input.parentID ? (await depth(input.parentID)) + 1 : 0
     const result: Info = {
       id: SessionID.descending(input.id),
       slug: Slug.create(),
@@ -310,6 +335,7 @@ export namespace Session {
       directory: input.directory,
       workspaceID: input.workspaceID,
       parentID: input.parentID,
+      depth: level,
       title: input.title ?? createDefaultTitle(!!input.parentID),
       permission: input.permission,
       time: {
@@ -347,7 +373,11 @@ export namespace Session {
   export const get = fn(SessionID.zod, async (id) => {
     const row = Database.use((db) => db.select().from(SessionTable).where(eq(SessionTable.id, id)).get())
     if (!row) throw new NotFoundError({ message: `Session not found: ${id}` })
-    return fromRow(row)
+    const info = fromRow(row)
+    return {
+      ...info,
+      depth: await depth(id),
+    }
   })
 
   export const share = fn(SessionID.zod, async (id) => {
@@ -564,17 +594,15 @@ export namespace Session {
       conditions.push(like(SessionTable.title, `%${input.search}%`))
     }
 
-    const limit = input?.limit ?? 100
-
-    const rows = Database.use((db) =>
-      db
+    const rows = Database.use((db) => {
+      const query = db
         .select()
         .from(SessionTable)
         .where(and(...conditions))
         .orderBy(desc(SessionTable.time_updated))
-        .limit(limit)
-        .all(),
-    )
+      if (input?.limit !== undefined) return query.limit(input.limit).all()
+      return query.all()
+    })
     for (const row of rows) {
       yield fromRow(row)
     }
