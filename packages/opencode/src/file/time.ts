@@ -11,6 +11,7 @@ export namespace FileTimeService {
   export interface Service {
     readonly read: (sessionID: SessionID, file: string) => Effect.Effect<void>
     readonly get: (sessionID: SessionID, file: string) => Effect.Effect<Date | undefined>
+    readonly list: (sessionID: SessionID) => Effect.Effect<string[]>
     readonly assert: (sessionID: SessionID, filepath: string) => Effect.Effect<void>
     readonly withLock: <T>(filepath: string, fn: () => Promise<T>) => Effect.Effect<T>
   }
@@ -72,6 +73,10 @@ export class FileTimeService extends ServiceMap.Service<FileTimeService, FileTim
           return reads.get(sessionID)?.get(file)?.read
         }),
 
+        list: Effect.fn("FileTimeService.list")(function* (sessionID: SessionID) {
+          return [...(reads.get(sessionID)?.keys() ?? [])]
+        }),
+
         assert: Effect.fn("FileTimeService.assert")(function* (sessionID: SessionID, filepath: string) {
           if (disableCheck) return
 
@@ -103,6 +108,10 @@ export namespace FileTime {
 
   export function get(sessionID: SessionID, file: string) {
     return runPromiseInstance(FileTimeService.use((s) => s.get(sessionID, file)))
+  }
+
+  export function list(sessionID: SessionID) {
+    return runPromiseInstance(FileTimeService.use((s) => s.list(sessionID)))
   }
 
   export async function assert(sessionID: SessionID, filepath: string) {
