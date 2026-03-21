@@ -716,6 +716,7 @@ export namespace Config {
         .string()
         .optional()
         .describe("Default model variant for this agent (applies only when using the agent's configured model)."),
+      fast: z.boolean().optional().describe("Default FAST mode for this agent when prompts do not override it."),
       temperature: z.number().optional(),
       top_p: z.number().optional(),
       prompt: z.string().optional(),
@@ -750,6 +751,7 @@ export namespace Config {
         "name",
         "model",
         "variant",
+        "fast",
         "prompt",
         "description",
         "temperature",
@@ -1003,6 +1005,32 @@ export namespace Config {
           baseURL: z.string().optional(),
           enterpriseUrl: z.string().optional().describe("GitHub Enterprise URL for copilot authentication"),
           setCacheKey: z.boolean().optional().describe("Enable promptCacheKey for this provider (default false)"),
+          websocketMode: z
+            .boolean()
+            .optional()
+            .describe("Enable Responses API WebSocket mode for this provider when available"),
+          compactionThreshold: z
+            .union([
+              z.number().int().min(1000).describe("Token threshold for Responses server-side compaction"),
+              z.literal(false).describe("Disable automatic Responses server-side compaction"),
+            ])
+            .optional(),
+          standaloneCompaction: z.boolean().optional().describe("Run /responses/compact before /responses requests"),
+          responsesSocketIdleTimeoutMs: z
+            .union([
+              z
+                .number()
+                .int()
+                .nonnegative()
+                .describe(
+                  "Idle timeout in milliseconds before closing an open Responses WebSocket. Default is 300000 (5 minutes). Set to false to disable idle eviction.",
+                ),
+              z.literal(false).describe("Disable Responses WebSocket idle eviction for this provider."),
+            ])
+            .optional()
+            .describe(
+              "Idle timeout in milliseconds before closing an open Responses WebSocket. Default is 300000 (5 minutes). Set to false to disable idle eviction.",
+            ),
           timeout: z
             .union([
               z
@@ -1196,7 +1224,10 @@ export namespace Config {
         .optional(),
       compaction: z
         .object({
-          auto: z.boolean().optional().describe("Enable automatic compaction when context is full (default: true)"),
+          auto: z
+            .boolean()
+            .optional()
+            .describe("Enable automatic compaction when context is full (default: false - use handoff instead)"),
           prune: z.boolean().optional().describe("Enable pruning of old tool outputs (default: true)"),
           reserved: z
             .number()
@@ -1225,6 +1256,14 @@ export namespace Config {
             .positive()
             .optional()
             .describe("Timeout in milliseconds for model context protocol (MCP) requests"),
+          max_delegation_depth: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe(
+              "Maximum depth of subagent delegation. 0 or undefined means subagents cannot spawn other subagents. Set to 1 to allow one level of nesting, 2 for two levels, etc.",
+            ),
         })
         .optional(),
     })
