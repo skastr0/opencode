@@ -1,6 +1,7 @@
 import { Installation } from "@/installation"
 import { Provider } from "@/provider/provider"
 import { Log } from "@/util/log"
+import type { LanguageModelV2Prompt } from "@ai-sdk/provider"
 import {
   streamText,
   wrapLanguageModel,
@@ -22,9 +23,14 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
+import type { ClaudeNativeStreamEvent } from "@/provider/native/claude-agent-sdk"
+import { streamClaudeNative } from "@/provider/native/claude-agent-sdk"
+import { ClaudeAgentSDKSessionStore } from "@/provider/native/session-store"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
+  const claudeSessionStore = new ClaudeAgentSDKSessionStore()
+
   export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 
   export type StreamInput = {
@@ -42,7 +48,20 @@ export namespace LLM {
     toolChoice?: "auto" | "required" | "none"
   }
 
-  export type StreamOutput = StreamTextResult<ToolSet, unknown>
+  type StreamTextPart =
+    StreamTextResult<ToolSet, unknown>["fullStream"] extends AsyncIterable<infer Part> ? Part : never
+  export type StreamOutput = {
+    fullStream: AsyncIterable<StreamTextPart | ClaudeNativeStreamEvent>
+    text: Promise<string>
+  }
+
+  export function serviceTier(input: { provider: string; auth?: Auth.Info["type"]; model: string; fast?: boolean }) {
+    if (input.provider !== "openai") return
+    if (input.auth !== "oauth") return
+    if (input.model !== "gpt-5.4") return
+    if (input.fast !== true) return
+    return "priority" as const
+  }
 
   export async function stream(input: StreamInput) {
     const l = log
@@ -57,8 +76,10 @@ export namespace LLM {
       modelID: input.model.id,
       providerID: input.model.providerID,
     })
+    const isNativeProvider = input.model.providerID === "claude-agent-sdk"
     const [language, cfg, provider, auth] = await Promise.all([
-      Provider.getLanguage(input.model),
+      // Native providers (claude-agent-sdk) don't use AI SDK language models
+      isNativeProvider ? Promise.resolve(null) : Provider.getLanguage(input.model),
       Config.get(),
       Provider.getProvider(input.model.providerID),
       Auth.get(input.model.providerID),
@@ -108,6 +129,13 @@ export namespace LLM {
       mergeDeep(input.agent.options),
       mergeDeep(variant),
     )
+    const tier = serviceTier({
+      provider: provider.id,
+      auth: auth?.type,
+      model: input.model.id,
+      fast: input.user.fast,
+    })
+    if (tier) options.serviceTier = tier
     if (isCodex) {
       options.instructions = SystemPrompt.instructions()
     }
@@ -170,6 +198,56 @@ export namespace LLM {
       })
     }
 
+    // Add passthrough stub for provider-executed tools (Claude Agent SDK)
+    // These tools are executed by the provider, not locally - we just need them
+    // to pass validation. The execute function should never be called due to providerExecuted flag.
+    tools["_providerExecuted"] = tool({
+      description: "Passthrough stub for provider-executed tools",
+      inputSchema: jsonSchema({ type: "object", additionalProperties: true }),
+      execute: async () => ({ output: "Provider executed", title: "Provider Tool", metadata: {} }),
+    })
+
+    if (input.model.providerID === "claude-agent-sdk") {
+      const sessionKey = input.sessionID
+      const sdkSessionId = await claudeSessionStore.get(sessionKey, input.model.id)
+      if (sdkSessionId) await claudeSessionStore.touch(sessionKey)
+
+      const prompt = ProviderTransform.message(input.messages, input.model, options) as LanguageModelV2Prompt
+
+      const nativeStream =
+        (globalThis as { __opencodeStreamClaudeNative?: typeof streamClaudeNative }).__opencodeStreamClaudeNative ??
+        streamClaudeNative
+
+      const native = await nativeStream({
+        sessionID: input.sessionID,
+        messageID: input.user.id,
+        model: input.model,
+        prompt,
+        abort: input.abort,
+        sdkSessionId,
+        onSessionId: (id) => void claudeSessionStore.set(sessionKey, id, input.model.id),
+        maxThinkingTokens: undefined,
+      })
+      let textPromise: Promise<string> | undefined
+
+      return {
+        fullStream: native.fullStream,
+        get text() {
+          if (textPromise) return textPromise
+          textPromise = (async () => {
+            let result = ""
+            for await (const part of native.fullStream) {
+              if (part.type === "text-delta") {
+                result += part.text
+              }
+            }
+            return result
+          })()
+          return textPromise
+        },
+      }
+    }
+
     return streamText({
       onError(error) {
         l.error("stream error", {
@@ -177,6 +255,19 @@ export namespace LLM {
         })
       },
       async experimental_repairToolCall(failed) {
+        // Provider-executed tools (from Claude Agent SDK) don't need local validation
+        // Map them to a passthrough stub that accepts any input
+        // The providerExecuted flag will prevent actual execution
+        if (failed.toolCall.providerExecuted) {
+          l.info("mapping provider-executed tool to passthrough", {
+            tool: failed.toolCall.toolName,
+          })
+          return {
+            ...failed.toolCall,
+            toolName: "_providerExecuted",
+          }
+        }
+
         const lower = failed.toolCall.toolName.toLowerCase()
         if (lower !== failed.toolCall.toolName && tools[lower]) {
           l.info("repairing tool call", {
@@ -201,7 +292,7 @@ export namespace LLM {
       topP: params.topP,
       topK: params.topK,
       providerOptions: ProviderTransform.providerOptions(input.model, params.options),
-      activeTools: Object.keys(tools).filter((x) => x !== "invalid"),
+      activeTools: Object.keys(tools).filter((x) => x !== "invalid" && x !== "_providerExecuted"),
       tools,
       toolChoice: input.toolChoice,
       maxOutputTokens,
@@ -233,7 +324,7 @@ export namespace LLM {
         ...input.messages,
       ],
       model: wrapLanguageModel({
-        model: language,
+        model: language!,
         middleware: [
           {
             async transformParams(args) {
@@ -242,6 +333,39 @@ export namespace LLM {
                 args.params.prompt = ProviderTransform.message(args.params.prompt, input.model, options)
               }
               return args.params
+            },
+            async wrapStream({ doStream }) {
+              const result = await doStream()
+              const headers = result.response?.headers
+              const raw =
+                headers instanceof Headers
+                  ? headers.get("x-opencode-transport")
+                  : headers && typeof headers === "object"
+                    ? (headers as Record<string, string>)["x-opencode-transport"]
+                    : undefined
+              const transport =
+                raw === "responses-websocket" ? "websocket" : raw === "responses-http" ? "http" : undefined
+              if (!transport) return result
+              return {
+                ...result,
+                stream: result.stream.pipeThrough(
+                  new TransformStream({
+                    transform(chunk: any, controller: any) {
+                      if (chunk.type === "text-start" || chunk.type === "finish") {
+                        controller.enqueue({
+                          ...chunk,
+                          providerMetadata: {
+                            ...chunk.providerMetadata,
+                            openai: { ...chunk.providerMetadata?.openai, transport },
+                          },
+                        })
+                      } else {
+                        controller.enqueue(chunk)
+                      }
+                    },
+                  }),
+                ),
+              }
             },
           },
         ],

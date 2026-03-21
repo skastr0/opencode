@@ -3,6 +3,7 @@ import { Config } from "../config/config"
 import { MCP } from "../mcp"
 import { Provider } from "../provider/provider"
 import { UI } from "./ui"
+import { ClaudeAgentSDK } from "@/provider/native/errors"
 
 export function FormatError(input: unknown) {
   if (MCP.Failed.isInstance(input))
@@ -36,6 +37,58 @@ export function FormatError(input: unknown) {
         (input.data.message ? `: ${input.data.message}` : ""),
       ...(input.data.issues?.map((issue) => "↳ " + issue.message + " " + issue.path.join(".")) ?? []),
     ].join("\n")
+
+  // Claude Agent SDK error formatting
+  if (ClaudeAgentSDK.AuthError.isInstance(input)) {
+    return [
+      "Claude Agent SDK authentication failed",
+      input.data.message,
+      "",
+      "To fix this:",
+      "  1. Run `claude login` to authenticate with your Anthropic account",
+      "  2. Or set the ANTHROPIC_API_KEY environment variable",
+      "  3. Or configure an API key in your opencode.json",
+    ].join("\n")
+  }
+  if (ClaudeAgentSDK.RateLimitError.isInstance(input)) {
+    const retryInfo = input.data.retryAfterMs
+      ? `Retry after ${Math.ceil(input.data.retryAfterMs / 1000)} seconds.`
+      : "Please wait and try again."
+    return ["Claude Agent SDK rate limited", input.data.message, retryInfo].join("\n")
+  }
+  if (ClaudeAgentSDK.ServerError.isInstance(input)) {
+    return [
+      "Claude Agent SDK server error",
+      input.data.message,
+      "",
+      "This is a temporary issue. The request will be retried automatically.",
+    ].join("\n")
+  }
+  if (ClaudeAgentSDK.SessionError.isInstance(input)) {
+    return ["Claude session error", input.data.message, "", "Try starting a new session or conversation."].join("\n")
+  }
+  if (ClaudeAgentSDK.ModelError.isInstance(input)) {
+    return [
+      "Claude model error",
+      input.data.message,
+      "",
+      "This may be due to context length limits or an invalid model configuration.",
+    ].join("\n")
+  }
+  if (ClaudeAgentSDK.ToolError.isInstance(input)) {
+    return [`Tool execution failed: ${input.data.toolName}`, input.data.message].join("\n")
+  }
+  if (ClaudeAgentSDK.Error.isInstance(input)) {
+    const retryHint = input.data.isRetryable
+      ? "This error may be retried automatically."
+      : "This error is not retryable."
+    return [
+      "Claude Agent SDK error",
+      input.data.message,
+      ...(input.data.code ? [`Error code: ${input.data.code}`] : []),
+      retryHint,
+    ].join("\n")
+  }
 
   if (UI.CancelledError.isInstance(input)) return ""
 }

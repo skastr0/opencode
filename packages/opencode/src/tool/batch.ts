@@ -2,9 +2,24 @@ import z from "zod"
 import { Tool } from "./tool"
 import { ProviderID, ModelID } from "../provider/schema"
 import DESCRIPTION from "./batch.txt"
+import { Log } from "../util/log"
+
+const log = Log.create({ service: "tool.batch" })
 
 const DISALLOWED = new Set(["batch"])
 const FILTERED_FROM_SUGGESTIONS = new Set(["invalid", "patch", ...DISALLOWED])
+
+// Normalize tool names from various formats to internal names
+// Handles: mcp__opencode__task -> task, Grep -> grep, Task -> task
+function normalizeToolName(name: string): string {
+  // Strip MCP prefix if present
+  const prefix = "mcp__opencode__"
+  if (name.startsWith(prefix)) {
+    name = name.slice(prefix.length)
+  }
+  // Lowercase for case-insensitive matching
+  return name.toLowerCase()
+}
 
 export const BatchTool = Tool.define("batch", async () => {
   return {
@@ -14,7 +29,7 @@ export const BatchTool = Tool.define("batch", async () => {
         .array(
           z.object({
             tool: z.string().describe("The name of the tool to execute"),
-            parameters: z.object({}).loose().describe("Parameters for the tool"),
+            parameters: z.record(z.string(), z.any()).describe("Parameters for the tool"),
           }),
         )
         .min(1, "Provide at least one tool call")
@@ -44,29 +59,44 @@ export const BatchTool = Tool.define("batch", async () => {
       const executeCall = async (call: (typeof toolCalls)[0]) => {
         const callStartTime = Date.now()
         const partID = PartID.ascending()
+        // Normalize tool name (mcp__opencode__task -> task, Grep -> grep)
+        const toolName = normalizeToolName(call.tool)
+
+        log.info("batch executeCall", { originalTool: call.tool, normalizedTool: toolName, partID })
 
         try {
-          if (DISALLOWED.has(call.tool)) {
+          if (DISALLOWED.has(toolName)) {
             throw new Error(
-              `Tool '${call.tool}' is not allowed in batch. Disallowed tools: ${Array.from(DISALLOWED).join(", ")}`,
+              `Tool '${toolName}' is not allowed in batch. Disallowed tools: ${Array.from(DISALLOWED).join(", ")}`,
             )
           }
 
-          const tool = toolMap.get(call.tool)
+          const tool = toolMap.get(toolName)
+          log.info("batch tool lookup", {
+            toolName,
+            found: !!tool,
+            availableTools: Array.from(toolMap.keys()).slice(0, 10),
+          })
           if (!tool) {
             const availableToolsList = Array.from(toolMap.keys()).filter((name) => !FILTERED_FROM_SUGGESTIONS.has(name))
             throw new Error(
-              `Tool '${call.tool}' not in registry. External tools (MCP, environment) cannot be batched - call them directly. Available tools: ${availableToolsList.join(", ")}`,
+              `Tool '${call.tool}' (normalized: '${toolName}') not in registry. External tools (MCP, environment) cannot be batched - call them directly. Available tools: ${availableToolsList.join(", ")}`,
             )
           }
+          log.info("batch validating params", {
+            toolName,
+            callParams: call.parameters,
+            callParamsKeys: Object.keys(call.parameters || {}),
+          })
           const validatedParams = tool.parameters.parse(call.parameters)
+          log.info("batch params validated", { toolName, validatedParamsKeys: Object.keys(validatedParams || {}) })
 
           await Session.updatePart({
             id: partID,
             messageID: ctx.messageID,
             sessionID: ctx.sessionID,
             type: "tool",
-            tool: call.tool,
+            tool: toolName, // Use normalized name
             callID: partID,
             state: {
               status: "running",
@@ -77,6 +107,7 @@ export const BatchTool = Tool.define("batch", async () => {
             },
           })
 
+          log.info("batch executing tool", { toolName, partID })
           const result = await tool.execute(validatedParams, { ...ctx, callID: partID })
           const attachments = result.attachments?.map((attachment) => ({
             ...attachment,
@@ -84,13 +115,14 @@ export const BatchTool = Tool.define("batch", async () => {
             sessionID: ctx.sessionID,
             messageID: ctx.messageID,
           }))
+          log.info("batch tool completed", { toolName, partID })
 
           await Session.updatePart({
             id: partID,
             messageID: ctx.messageID,
             sessionID: ctx.sessionID,
             type: "tool",
-            tool: call.tool,
+            tool: toolName, // Use normalized name
             callID: partID,
             state: {
               status: "completed",
@@ -106,14 +138,20 @@ export const BatchTool = Tool.define("batch", async () => {
             },
           })
 
-          return { success: true as const, tool: call.tool, result }
+          return { success: true as const, tool: toolName, result }
         } catch (error) {
+          log.error("batch tool error", {
+            toolName,
+            partID,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          })
           await Session.updatePart({
             id: partID,
             messageID: ctx.messageID,
             sessionID: ctx.sessionID,
             type: "tool",
-            tool: call.tool,
+            tool: toolName, // Use normalized name
             callID: partID,
             state: {
               status: "error",
@@ -126,22 +164,28 @@ export const BatchTool = Tool.define("batch", async () => {
             },
           })
 
-          return { success: false as const, tool: call.tool, error }
+          return { success: false as const, tool: toolName, error }
         }
       }
 
+      log.info("batch starting parallel execution", { toolCount: toolCalls.length })
       const results = await Promise.all(toolCalls.map((call) => executeCall(call)))
+      log.info("batch parallel execution complete", {
+        resultsCount: results.length,
+        successCount: results.filter((r) => r.success).length,
+      })
 
       // Add discarded calls as errors
       const now = Date.now()
       for (const call of discardedCalls) {
         const partID = PartID.ascending()
+        const discardedToolName = normalizeToolName(call.tool)
         await Session.updatePart({
           id: partID,
           messageID: ctx.messageID,
           sessionID: ctx.sessionID,
           type: "tool",
-          tool: call.tool,
+          tool: discardedToolName,
           callID: partID,
           state: {
             status: "error",
@@ -152,7 +196,7 @@ export const BatchTool = Tool.define("batch", async () => {
         })
         results.push({
           success: false as const,
-          tool: call.tool,
+          tool: discardedToolName,
           error: new Error("Maximum of 25 tools allowed in batch"),
         })
       }
@@ -173,7 +217,7 @@ export const BatchTool = Tool.define("batch", async () => {
           totalCalls: results.length,
           successful: successfulCalls,
           failed: failedCalls,
-          tools: params.tool_calls.map((c) => c.tool),
+          tools: params.tool_calls.map((c) => normalizeToolName(c.tool)),
           details: results.map((r) => ({ tool: r.tool, success: r.success })),
         },
       }

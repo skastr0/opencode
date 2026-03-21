@@ -4,12 +4,12 @@ import {
   createMemo,
   createSignal,
   For,
+  Index,
   Match,
   onMount,
   Show,
   Switch,
   onCleanup,
-  Index,
   type JSX,
 } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -28,6 +28,8 @@ import {
   Todo,
   QuestionAnswer,
   QuestionInfo,
+  type ToolState,
+  type ToolStateError,
 } from "@opencode-ai/sdk/v2"
 import { useData } from "../context"
 import { useFileComponent } from "../context/file"
@@ -1222,6 +1224,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   const input = () => part().state?.input ?? emptyInput
   // @ts-expect-error
   const partMetadata = () => part().state?.metadata ?? emptyMetadata
+  const loc = useLocation()
   const taskId = createMemo(() => {
     if (part().tool !== "task") return
     const value = partMetadata().sessionId
@@ -1229,7 +1232,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   })
   const taskHref = createMemo(() => {
     if (part().tool !== "task") return
-    return sessionLink(taskId(), useLocation().pathname, data.sessionHref)
+    return sessionLink(taskId(), loc.pathname, data.sessionHref)
   })
   const taskSubtitle = createMemo(() => {
     if (part().tool !== "task") return undefined
@@ -1237,16 +1240,23 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
     if (typeof value === "string" && value) return value
     return taskId()
   })
+  const err = () => {
+    const state = part().state
+    if (state.status !== "error") return undefined
+    if (!("error" in state)) return undefined
+    const value = state.error
+    return typeof value === "string" ? value : undefined
+  }
 
-  const render = createMemo(() => ToolRegistry.render(part().tool) ?? GenericTool)
+  const render = () => ToolRegistry.render(part().tool) ?? GenericTool
 
   return (
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper">
         <Switch>
-          <Match when={part().state.status === "error" && (part().state as any).error}>
-            {(error) => {
-              const cleaned = error().replace("Error: ", "")
+          <Match when={err()}>
+            {(value) => {
+              const cleaned = value().replace("Error: ", "")
               if (part().tool === "question" && cleaned.includes("dismissed this question")) {
                 return (
                   <div style="width: 100%; display: flex; justify-content: flex-end;">
@@ -1259,7 +1269,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               return (
                 <ToolErrorCard
                   tool={part().tool}
-                  error={error()}
+                  error={value()}
                   defaultOpen={props.defaultOpen}
                   subtitle={taskSubtitle()}
                   href={taskHref()}

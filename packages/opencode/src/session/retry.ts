@@ -1,6 +1,7 @@
 import type { NamedError } from "@opencode-ai/util/error"
 import { MessageV2 } from "./message-v2"
 import { iife } from "@/util/iife"
+import { ClaudeAgentSDK } from "@/provider/native/errors"
 
 export namespace SessionRetry {
   export const RETRY_INITIAL_DELAY = 2000
@@ -59,6 +60,29 @@ export namespace SessionRetry {
   }
 
   export function retryable(error: ReturnType<NamedError["toObject"]>) {
+    // Claude Agent SDK specific error handling
+    if (ClaudeAgentSDK.RateLimitError.isInstance(error)) {
+      return "Claude Agent SDK rate limited"
+    }
+    if (ClaudeAgentSDK.ServerError.isInstance(error)) {
+      const msg = error.data.message
+      if (msg.toLowerCase().includes("overloaded")) {
+        return "Claude Agent SDK is overloaded"
+      }
+      return "Claude Agent SDK server error"
+    }
+    if (ClaudeAgentSDK.Error.isInstance(error) && error.data.isRetryable) {
+      return error.data.message
+    }
+    // Non-retryable SDK errors
+    if (
+      ClaudeAgentSDK.AuthError.isInstance(error) ||
+      ClaudeAgentSDK.SessionError.isInstance(error) ||
+      ClaudeAgentSDK.ModelError.isInstance(error) ||
+      ClaudeAgentSDK.ToolError.isInstance(error)
+    ) {
+      return undefined
+    }
     // context overflow errors should not be retried
     if (MessageV2.ContextOverflowError.isInstance(error)) return undefined
     if (MessageV2.APIError.isInstance(error)) {

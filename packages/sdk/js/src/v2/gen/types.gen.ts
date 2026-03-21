@@ -253,6 +253,7 @@ export type UserMessage = {
     [key: string]: boolean
   }
   variant?: string
+  fast?: boolean
 }
 
 export type ProviderAuthError = {
@@ -560,6 +561,9 @@ export type StepFinishPart = {
   reason: string
   snapshot?: string
   cost: number
+  metadata?: {
+    [key: string]: unknown
+  }
   tokens: {
     total?: number
     input: number
@@ -693,13 +697,6 @@ export type EventSessionIdle = {
   }
 }
 
-export type EventSessionCompacted = {
-  type: "session.compacted"
-  properties: {
-    sessionID: string
-  }
-}
-
 export type Todo = {
   /**
    * Brief description of the task
@@ -792,6 +789,13 @@ export type EventMcpBrowserOpenFailed = {
   }
 }
 
+export type EventSessionCompacted = {
+  type: "session.compacted"
+  properties: {
+    sessionID: string
+  }
+}
+
 export type EventCommandExecuted = {
   type: "command.executed"
   properties: {
@@ -819,6 +823,10 @@ export type Session = {
   workspaceID?: string
   directory: string
   parentID?: string
+  /**
+   * Nesting depth of session (0 for root, increments for subagent sessions)
+   */
+  depth?: number
   summary?: {
     additions: number
     deletions: number
@@ -957,6 +965,14 @@ export type EventWorktreeFailed = {
   }
 }
 
+export type EventSessionHandoffCompleted = {
+  type: "session.handoff.completed"
+  properties: {
+    sourceSessionID: string
+    targetSessionID: string
+  }
+}
+
 export type Event =
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
@@ -981,7 +997,6 @@ export type Event =
   | EventMessagePartRemoved
   | EventSessionStatus
   | EventSessionIdle
-  | EventSessionCompacted
   | EventTodoUpdated
   | EventTuiPromptAppend
   | EventTuiCommandExecute
@@ -989,6 +1004,7 @@ export type Event =
   | EventTuiSessionSelect
   | EventMcpToolsChanged
   | EventMcpBrowserOpenFailed
+  | EventSessionCompacted
   | EventCommandExecuted
   | EventSessionCreated
   | EventSessionUpdated
@@ -1003,6 +1019,7 @@ export type Event =
   | EventPtyDeleted
   | EventWorktreeReady
   | EventWorktreeFailed
+  | EventSessionHandoffCompleted
 
 export type GlobalEvent = {
   directory: string
@@ -1222,6 +1239,19 @@ export type ProviderConfig = {
      */
     setCacheKey?: boolean
     /**
+     * Enable Responses API WebSocket mode for this provider when available
+     */
+    websocketMode?: boolean
+    compactionThreshold?: number | false
+    /**
+     * Run /responses/compact before /responses requests
+     */
+    standaloneCompaction?: boolean
+    /**
+     * Idle timeout in milliseconds before closing an open Responses WebSocket. Default is 300000 (5 minutes). Set to false to disable idle eviction.
+     */
+    responsesSocketIdleTimeoutMs?: number | false
+    /**
      * Timeout in milliseconds for requests to this provider. Default is 300000 (5 minutes). Set to false to disable timeout.
      */
     timeout?: number | false
@@ -1229,7 +1259,7 @@ export type ProviderConfig = {
      * Timeout in milliseconds between streamed SSE chunks for this provider. If no chunk arrives within this window, the request is aborted.
      */
     chunkTimeout?: number
-    [key: string]: unknown | string | boolean | number | false | number | undefined
+    [key: string]: unknown | string | boolean | number | false | undefined
   }
 }
 
@@ -1469,7 +1499,7 @@ export type Config = {
   }
   compaction?: {
     /**
-     * Enable automatic compaction when context is full (default: true)
+     * Enable automatic compaction when context is full (default: false - use handoff instead)
      */
     auto?: boolean
     /**
@@ -1503,6 +1533,10 @@ export type Config = {
      * Timeout in milliseconds for model context protocol (MCP) requests
      */
     mcp_timeout?: number
+    /**
+     * Maximum depth of subagent delegation. 0 or undefined means subagents cannot spawn other subagents. Set to 1 to allow one level of nesting, 2 for two levels, etc.
+     */
+    max_delegation_depth?: number
   }
 }
 
@@ -1683,6 +1717,10 @@ export type GlobalSession = {
   workspaceID?: string
   directory: string
   parentID?: string
+  /**
+   * Nesting depth of session (0 for root, increments for subagent sessions)
+   */
+  depth?: number
   summary?: {
     additions: number
     deletions: number
@@ -1821,6 +1859,7 @@ export type File = {
   added: number
   removed: number
   status: "added" | "deleted" | "modified"
+  stage?: "staged" | "unstaged" | "untracked"
 }
 
 export type McpStatusConnected = {
@@ -3287,6 +3326,7 @@ export type SessionPromptData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    fast?: boolean
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3487,6 +3527,7 @@ export type SessionPromptAsyncData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    fast?: boolean
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3529,6 +3570,7 @@ export type SessionCommandData = {
     arguments: string
     command: string
     variant?: string
+    fast?: boolean
     parts?: Array<{
       id?: string
       type: "file"
@@ -3580,6 +3622,7 @@ export type SessionShellData = {
       providerID: string
       modelID: string
     }
+    fast?: boolean
     command: string
   }
   path: {
@@ -4163,6 +4206,7 @@ export type FileReadData = {
     directory?: string
     workspace?: string
     path: string
+    stage?: "staged" | "unstaged"
   }
   url: "/file/content"
 }
@@ -4741,6 +4785,50 @@ export type TuiControlResponseResponses = {
 }
 
 export type TuiControlResponseResponse = TuiControlResponseResponses[keyof TuiControlResponseResponses]
+
+export type SessionHandoffData = {
+  body?: {
+    /**
+     * Handoff instruction/focus
+     */
+    instruction: string
+    modelID: string
+    providerID: string
+  }
+  path: {
+    /**
+     * Source session ID
+     */
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/handoff"
+}
+
+export type SessionHandoffErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionHandoffError = SessionHandoffErrors[keyof SessionHandoffErrors]
+
+export type SessionHandoffResponses = {
+  /**
+   * New session created with handoff context
+   */
+  200: Session
+}
+
+export type SessionHandoffResponse = SessionHandoffResponses[keyof SessionHandoffResponses]
 
 export type InstanceDisposeData = {
   body?: never

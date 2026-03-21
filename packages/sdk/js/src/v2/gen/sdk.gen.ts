@@ -120,6 +120,8 @@ import type {
   SessionForkResponses,
   SessionGetErrors,
   SessionGetResponses,
+  SessionHandoffErrors,
+  SessionHandoffResponses,
   SessionInitErrors,
   SessionInitResponses,
   SessionListResponses,
@@ -1841,6 +1843,7 @@ export class Session2 extends HeyApiClient {
       format?: OutputFormat
       system?: string
       variant?: string
+      fast?: boolean
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
     options?: Options<never, ThrowOnError>,
@@ -1861,6 +1864,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "format" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
+            { in: "body", key: "fast" },
             { in: "body", key: "parts" },
           ],
         },
@@ -1973,6 +1977,7 @@ export class Session2 extends HeyApiClient {
       format?: OutputFormat
       system?: string
       variant?: string
+      fast?: boolean
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
     options?: Options<never, ThrowOnError>,
@@ -1993,6 +1998,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "format" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
+            { in: "body", key: "fast" },
             { in: "body", key: "parts" },
           ],
         },
@@ -2026,6 +2032,7 @@ export class Session2 extends HeyApiClient {
       arguments?: string
       command?: string
       variant?: string
+      fast?: boolean
       parts?: Array<{
         id?: string
         type: "file"
@@ -2051,6 +2058,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "arguments" },
             { in: "body", key: "command" },
             { in: "body", key: "variant" },
+            { in: "body", key: "fast" },
             { in: "body", key: "parts" },
           ],
         },
@@ -2083,6 +2091,7 @@ export class Session2 extends HeyApiClient {
         providerID: string
         modelID: string
       }
+      fast?: boolean
       command?: string
     },
     options?: Options<never, ThrowOnError>,
@@ -2097,6 +2106,7 @@ export class Session2 extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "body", key: "agent" },
             { in: "body", key: "model" },
+            { in: "body", key: "fast" },
             { in: "body", key: "command" },
           ],
         },
@@ -2184,6 +2194,47 @@ export class Session2 extends HeyApiClient {
       url: "/session/{sessionID}/unrevert",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Handoff session to a new session with summarized context
+   */
+  public handoff<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      instruction?: string
+      modelID?: string
+      providerID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "instruction" },
+            { in: "body", key: "modelID" },
+            { in: "body", key: "providerID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionHandoffResponses, SessionHandoffErrors, ThrowOnError>({
+      url: "/session/{sessionID}/handoff",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }
@@ -2788,6 +2839,7 @@ export class File extends HeyApiClient {
       directory?: string
       workspace?: string
       path: string
+      stage?: "staged" | "unstaged"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -2799,6 +2851,7 @@ export class File extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "query", key: "path" },
+            { in: "query", key: "stage" },
           ],
         },
       ],

@@ -4,7 +4,7 @@ import os from "os"
 import path from "path"
 import fs from "fs/promises"
 import { setTimeout as sleep } from "node:timers/promises"
-import { afterAll } from "bun:test"
+import { afterAll, mock } from "bun:test"
 
 // Set XDG env vars FIRST, before any src/ imports
 const dir = path.join(os.tmpdir(), "opencode-test-data-" + process.pid)
@@ -73,6 +73,19 @@ delete process.env["CEREBRAS_API_KEY"]
 delete process.env["SAMBANOVA_API_KEY"]
 delete process.env["OPENCODE_SERVER_PASSWORD"]
 delete process.env["OPENCODE_SERVER_USERNAME"]
+
+mock.module("@anthropic-ai/claude-agent-sdk", () => ({
+  createSdkMcpServer: (input: unknown) => ({ type: "sdk", name: "opencode", instance: input }),
+  query: (params: { prompt: unknown; options?: unknown }) => {
+    const hook = (
+      globalThis as {
+        __opencodeSdkQuery?: (args: { prompt: unknown; options?: unknown }) => AsyncIterable<Record<string, unknown>>
+      }
+    ).__opencodeSdkQuery
+    if (hook) return hook(params)
+    return (async function* () {})()
+  },
+}))
 
 // Now safe to import from src/
 const { Log } = await import("../src/util/log")
