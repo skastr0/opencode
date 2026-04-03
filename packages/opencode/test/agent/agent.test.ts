@@ -128,6 +128,7 @@ test("custom agent from config creates new agent", async () => {
         my_custom_agent: {
           model: "openai/gpt-4",
           description: "My custom agent",
+          fast: true,
           temperature: 0.5,
           top_p: 0.9,
         },
@@ -142,6 +143,7 @@ test("custom agent from config creates new agent", async () => {
       expect(String(custom?.model?.providerID)).toBe("openai")
       expect(String(custom?.model?.modelID)).toBe("gpt-4")
       expect(custom?.description).toBe("My custom agent")
+      expect(custom?.fast).toBe(true)
       expect(custom?.temperature).toBe(0.5)
       expect(custom?.topP).toBe(0.9)
       expect(custom?.native).toBe(false)

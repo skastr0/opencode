@@ -554,6 +554,7 @@ export type UserMessage = {
     [key: string]: boolean
   }
   variant?: string
+  fast?: boolean
 }
 
 export type AssistantMessage = {
@@ -913,6 +914,10 @@ export type Session = {
   workspaceID?: string
   directory: string
   parentID?: string
+  /**
+   * Nesting depth of session (0 for root, increments for subagent sessions)
+   */
+  depth?: number
   summary?: {
     additions: number
     deletions: number
@@ -1074,6 +1079,7 @@ export type SyncEventSessionUpdated = {
       workspaceID: string | null
       directory: string | null
       parentID: string | null
+      depth: number | null
       summary: {
         additions: number
         deletions: number
@@ -1183,6 +1189,10 @@ export type AgentConfig = {
    * Default model variant for this agent (applies only when using the agent's configured model).
    */
   variant?: string
+  /**
+   * Default FAST mode for this agent when prompts do not override it.
+   */
+  fast?: boolean
   temperature?: number
   top_p?: number
   prompt?: string
@@ -1221,11 +1231,11 @@ export type AgentConfig = {
   [key: string]:
     | unknown
     | string
+    | boolean
     | number
     | {
         [key: string]: boolean
       }
-    | boolean
     | "subagent"
     | "primary"
     | "all"
@@ -1327,6 +1337,19 @@ export type ProviderConfig = {
      */
     setCacheKey?: boolean
     /**
+     * Enable Responses API WebSocket mode for this provider when available
+     */
+    websocketMode?: boolean
+    compactionThreshold?: number | false
+    /**
+     * Run /responses/compact before /responses requests
+     */
+    standaloneCompaction?: boolean
+    /**
+     * Idle timeout in milliseconds before closing an open Responses WebSocket. Default is 300000 (5 minutes). Set to false to disable idle eviction.
+     */
+    responsesSocketIdleTimeoutMs?: number | false
+    /**
      * Timeout in milliseconds for requests to this provider. Default is 300000 (5 minutes). Set to false to disable timeout.
      */
     timeout?: number | false
@@ -1334,7 +1357,7 @@ export type ProviderConfig = {
      * Timeout in milliseconds between streamed SSE chunks for this provider. If no chunk arrives within this window, the request is aborted.
      */
     chunkTimeout?: number
-    [key: string]: unknown | string | boolean | number | false | number | undefined
+    [key: string]: unknown | string | boolean | number | false | number | false | number | false | number | undefined
   }
 }
 
@@ -1616,6 +1639,10 @@ export type Config = {
      * Timeout in milliseconds for model context protocol (MCP) requests
      */
     mcp_timeout?: number
+    /**
+     * Maximum depth of subagent delegation. 0 or undefined means subagents cannot spawn other subagents. Set to 1 to allow one level of nesting, 2 for two levels, etc.
+     */
+    max_delegation_depth?: number
   }
 }
 
@@ -1796,6 +1823,10 @@ export type GlobalSession = {
   workspaceID?: string
   directory: string
   parentID?: string
+  /**
+   * Nesting depth of session (0 for root, increments for subagent sessions)
+   */
+  depth?: number
   summary?: {
     additions: number
     deletions: number
@@ -2031,6 +2062,7 @@ export type Agent = {
     providerID: string
   }
   variant?: string
+  fast?: boolean
   prompt?: string
   options: {
     [key: string]: unknown
@@ -3527,6 +3559,7 @@ export type SessionPromptData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    fast?: boolean
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3727,6 +3760,7 @@ export type SessionPromptAsyncData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    fast?: boolean
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3769,6 +3803,7 @@ export type SessionCommandData = {
     arguments: string
     command: string
     variant?: string
+    fast?: boolean
     parts?: Array<{
       id?: string
       type: "file"
@@ -3820,6 +3855,7 @@ export type SessionShellData = {
       providerID: string
       modelID: string
     }
+    fast?: boolean
     command: string
   }
   path: {

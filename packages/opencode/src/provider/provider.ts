@@ -1308,41 +1308,559 @@ export namespace Provider {
           const chunkTimeout = options["chunkTimeout"]
           delete options["chunkTimeout"]
 
+          type ResponsesSocketState = {
+            socket?: WebSocket
+            key?: string
+            busy: boolean
+            idleTimer?: ReturnType<typeof setTimeout>
+          }
+
+          const responsesSockets = new Map<string, ResponsesSocketState>()
+          let responsesSocketRetryAfter = 0
+          const responsesSocketRetryDelay = 30_000
+
+          const getResponsesSocketState = (session: string) => {
+            const match = responsesSockets.get(session)
+            if (match) return match
+            const state: ResponsesSocketState = { busy: false }
+            responsesSockets.set(session, state)
+            return state
+          }
+
+          const cleanupResponsesSocketState = (session: string) => {
+            const match = responsesSockets.get(session)
+            if (!match) return
+            if (match.busy) return
+            if (match.socket) return
+            if (match.idleTimer) return
+            responsesSockets.delete(session)
+          }
+
+          const clearResponsesSocketIdleTimer = (session: string) => {
+            const match = responsesSockets.get(session)
+            if (!match?.idleTimer) return
+            clearTimeout(match.idleTimer)
+            match.idleTimer = undefined
+          }
+
+          const closeResponsesWebSocket = (session: string, preserveBusy = false, reason = "stale") => {
+            const match = responsesSockets.get(session)
+            if (!match) return
+            clearResponsesSocketIdleTimer(session)
+            if (
+              match.socket &&
+              (match.socket.readyState === WebSocket.OPEN || match.socket.readyState === WebSocket.CONNECTING)
+            ) {
+              log.debug("closing responses websocket", {
+                providerID: model.providerID,
+                modelID: model.id,
+                session,
+                preserveBusy,
+                reason,
+              })
+              match.socket.close(1000, reason)
+            }
+            match.socket = undefined
+            match.key = undefined
+            if (!preserveBusy) {
+              match.busy = false
+              cleanupResponsesSocketState(session)
+            }
+          }
+
+          const getWebSocketHeaders = (headers: BunFetchRequestInit["headers"]) => {
+            const resolved = Object.fromEntries(new Headers(headers).entries())
+            resolved["openai-beta"] = "responses_websockets=2026-02-06"
+            return resolved
+          }
+
+          const getWebSocketKey = (url: string, headers: Record<string, string>) => {
+            return JSON.stringify({
+              url,
+              authorization: headers["authorization"],
+              accountId: headers["chatgpt-account-id"],
+            })
+          }
+
+          const getResponsesSocketSession = (body: Record<string, any>) => {
+            const key = body["prompt_cache_key"] ?? body["promptCacheKey"]
+            if (typeof key === "string" && key.trim()) return key
+            return "__default__"
+          }
+
+          const scheduleResponsesWebSocketIdleClose = (session: string, timeout: number | undefined) => {
+            if (timeout === undefined) return
+            const match = responsesSockets.get(session)
+            if (!match) return
+            if (match.busy) return
+            if (!match.socket) {
+              cleanupResponsesSocketState(session)
+              return
+            }
+            clearResponsesSocketIdleTimer(session)
+            log.debug("scheduled responses websocket idle close", {
+              providerID: model.providerID,
+              modelID: model.id,
+              session,
+              timeout,
+            })
+            match.idleTimer = setTimeout(() => {
+              const next = responsesSockets.get(session)
+              if (!next) return
+              if (next.busy) return
+              if (!next.socket) {
+                cleanupResponsesSocketState(session)
+                return
+              }
+              log.debug("evicting idle responses websocket", {
+                providerID: model.providerID,
+                modelID: model.id,
+                session,
+                timeout,
+              })
+              closeResponsesWebSocket(session, false, "idle-timeout")
+            }, timeout)
+          }
+
+          const openResponsesWebSocket = async (
+            session: string,
+            url: string,
+            headers: Record<string, string>,
+            signal?: AbortSignal,
+          ): Promise<WebSocket> => {
+            const state = getResponsesSocketState(session)
+            const socketKey = getWebSocketKey(url, headers)
+
+            if (state.socket && state.socket.readyState === WebSocket.OPEN && state.key === socketKey) {
+              log.debug("reusing responses websocket", {
+                providerID: model.providerID,
+                modelID: model.id,
+                session,
+              })
+              clearResponsesSocketIdleTimer(session)
+              return state.socket
+            }
+
+            if (
+              state.socket &&
+              (state.socket.readyState === WebSocket.OPEN || state.socket.readyState === WebSocket.CONNECTING)
+            ) {
+              closeResponsesWebSocket(session, true, "stale")
+            }
+
+            log.info("opening responses websocket", {
+              providerID: model.providerID,
+              modelID: model.id,
+              url,
+              hasAuth: !!headers["authorization"],
+            })
+
+            const ws = await new Promise<WebSocket>((resolve, reject) => {
+              const socket = new WebSocket(url, { headers } as any)
+              let timer: ReturnType<typeof setTimeout> | undefined
+
+              const cleanup = () => {
+                socket.removeEventListener("open", onOpen)
+                socket.removeEventListener("error", onError)
+                socket.removeEventListener("close", onClose)
+                signal?.removeEventListener("abort", onAbort)
+                if (timer) clearTimeout(timer)
+              }
+
+              const fail = (reason: string) => {
+                cleanup()
+                try {
+                  if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close()
+                } catch {}
+                log.error("websocket connection failed", {
+                  providerID: model.providerID,
+                  modelID: model.id,
+                  reason,
+                })
+                reject(new Error(reason))
+              }
+
+              const onOpen = () => {
+                cleanup()
+                log.info("websocket connection established", {
+                  providerID: model.providerID,
+                  modelID: model.id,
+                })
+                resolve(socket)
+              }
+
+              const onError = () => fail("websocket connection error")
+              const onClose = (event: Event) => {
+                const close = event as CloseEvent
+                fail(`websocket closed before open${close.code ? ` (code=${close.code}, reason=${close.reason})` : ""}`)
+              }
+              const onAbort = () => fail("websocket aborted")
+
+              socket.addEventListener("open", onOpen)
+              socket.addEventListener("error", onError)
+              socket.addEventListener("close", onClose)
+
+              if (signal?.aborted) {
+                onAbort()
+                return
+              }
+              signal?.addEventListener("abort", onAbort, { once: true })
+              timer = setTimeout(() => fail("websocket connection timeout (3s)"), 3000)
+            })
+
+            ws.addEventListener("close", (event: Event) => {
+              const close = event as CloseEvent
+              log.debug("responses websocket closed", {
+                providerID: model.providerID,
+                modelID: model.id,
+                session,
+                code: close.code,
+                reason: close.reason,
+              })
+              const match = responsesSockets.get(session)
+              if (!match || match.socket !== ws) return
+              clearResponsesSocketIdleTimer(session)
+              match.socket = undefined
+              match.key = undefined
+              match.busy = false
+              cleanupResponsesSocketState(session)
+            })
+
+            state.socket = ws
+            state.key = socketKey
+            return ws
+          }
+
           options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
             const fetchFn = customFetch ?? fetch
             const opts = init ?? {}
             const chunkAbortCtl =
               typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
             const signals: AbortSignal[] = []
+            const requestUrl =
+              input instanceof URL ? input : new URL(typeof input === "string" ? input : (input as Request).url)
+
+            const isOpenAIRequest = model.api.npm === "@ai-sdk/openai" && opts.body && opts.method === "POST"
+            const isOpenAIResponsesRequest = isOpenAIRequest && requestUrl.pathname.endsWith("/responses")
+            const defaultCompactionThreshold: number | undefined = undefined
+            const defaultResponsesSocketIdleTimeout = 5 * 60 * 1000
+            const websocketMode =
+              options["websocketMode"] === undefined
+                ? model.providerID === "openai"
+                : options["websocketMode"] !== false
+            const standaloneCompaction = options["standaloneCompaction"] === true
+            const compactionThreshold =
+              options["compactionThreshold"] === false
+                ? undefined
+                : typeof options["compactionThreshold"] === "number"
+                  ? options["compactionThreshold"]
+                  : defaultCompactionThreshold
+            const responsesSocketIdleTimeout =
+              options["responsesSocketIdleTimeoutMs"] === false
+                ? undefined
+                : typeof options["responsesSocketIdleTimeoutMs"] === "number"
+                  ? Math.max(0, Math.floor(options["responsesSocketIdleTimeoutMs"]))
+                  : defaultResponsesSocketIdleTimeout
+
+            let parsedBody: Record<string, any> | undefined
+            if (isOpenAIRequest && typeof opts.body === "string") {
+              try {
+                parsedBody = JSON.parse(opts.body)
+              } catch {}
+            }
 
             if (opts.signal) signals.push(opts.signal)
             if (chunkAbortCtl) signals.push(chunkAbortCtl.signal)
-            if (options["timeout"] !== undefined && options["timeout"] !== null && options["timeout"] !== false)
+            if (options["timeout"] !== undefined && options["timeout"] !== null && options["timeout"] !== false) {
               signals.push(AbortSignal.timeout(options["timeout"]))
+            }
 
             const combined = signals.length === 0 ? null : signals.length === 1 ? signals[0] : AbortSignal.any(signals)
             if (combined) opts.signal = combined
 
-            // Strip openai itemId metadata following what codex does
-            if (model.api.npm === "@ai-sdk/openai" && opts.body && opts.method === "POST") {
-              const body = JSON.parse(opts.body as string)
+            if (isOpenAIRequest && parsedBody) {
+              const body = parsedBody
               const isAzure = model.providerID.includes("azure")
               const keepIds = isAzure && body.store === true
               if (!keepIds && Array.isArray(body.input)) {
                 for (const item of body.input) {
-                  if ("id" in item) {
-                    delete item.id
-                  }
+                  if ("id" in item) delete item.id
                 }
-                opts.body = JSON.stringify(body)
+              }
+
+              if (
+                isOpenAIResponsesRequest &&
+                compactionThreshold !== undefined &&
+                Number.isFinite(compactionThreshold) &&
+                body.context_management == null
+              ) {
+                body.context_management = [
+                  {
+                    type: "compaction",
+                    compact_threshold: Math.max(1000, Math.floor(compactionThreshold)),
+                  },
+                ]
+              }
+
+              if (
+                isOpenAIResponsesRequest &&
+                standaloneCompaction &&
+                Array.isArray(body.input) &&
+                body.input.length > 0
+              ) {
+                const compactUrl = new URL(requestUrl.toString())
+                compactUrl.pathname = compactUrl.pathname.replace(/\/responses$/, "/responses/compact")
+
+                try {
+                  const compactHeaders = new Headers(opts.headers)
+                  compactHeaders.set("content-type", "application/json")
+                  const compactResult = await fetchFn(compactUrl, {
+                    method: "POST",
+                    headers: compactHeaders,
+                    body: JSON.stringify({ model: body.model, input: body.input }),
+                    signal: opts.signal,
+                    // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
+                    timeout: false,
+                  })
+
+                  if (compactResult.ok) {
+                    const compactJson = await compactResult.json().catch(() => undefined)
+                    if (compactJson && typeof compactJson === "object" && Array.isArray((compactJson as any).output)) {
+                      body.input = (compactJson as any).output
+                    }
+                  }
+                } catch (error) {
+                  log.warn("standalone compaction failed", {
+                    providerID: model.providerID,
+                    modelID: model.id,
+                    error,
+                  })
+                }
+              }
+
+              opts.body = JSON.stringify(body)
+              parsedBody = body
+            }
+
+            const responsesSocketSession =
+              isOpenAIResponsesRequest && parsedBody ? getResponsesSocketSession(parsedBody) : undefined
+            const responsesSocketState = responsesSocketSession
+              ? getResponsesSocketState(responsesSocketSession)
+              : undefined
+            const responsesSocketReady = Date.now() >= responsesSocketRetryAfter
+
+            if (
+              isOpenAIResponsesRequest &&
+              websocketMode &&
+              parsedBody &&
+              parsedBody.stream === true &&
+              responsesSocketSession &&
+              responsesSocketState &&
+              !responsesSocketState.busy &&
+              responsesSocketReady
+            ) {
+              const wsHeaders = getWebSocketHeaders(opts.headers)
+              let wsUrl: URL
+
+              if (customFetch) {
+                const auth = await Auth.get(model.providerID)
+                if (auth?.type === "oauth" && auth.access) {
+                  wsHeaders["authorization"] = `Bearer ${auth.access}`
+                  const authWithAccount = auth as typeof auth & { accountId?: string }
+                  if (authWithAccount.accountId) {
+                    wsHeaders["chatgpt-account-id"] = authWithAccount.accountId
+                  }
+                  wsUrl = new URL("wss://chatgpt.com/backend-api/codex/responses")
+                } else {
+                  wsUrl = new URL(requestUrl.toString())
+                  wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:"
+                }
+              } else {
+                wsUrl = new URL(requestUrl.toString())
+                wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:"
+              }
+
+              responsesSocketState.busy = true
+              let socket: WebSocket | undefined
+              try {
+                socket = await openResponsesWebSocket(
+                  responsesSocketSession,
+                  wsUrl.toString(),
+                  wsHeaders,
+                  opts.signal ?? undefined,
+                )
+              } catch (error) {
+                responsesSocketState.busy = false
+                closeResponsesWebSocket(responsesSocketSession, false, "open-failed")
+                if (opts.signal?.aborted) throw error
+                responsesSocketRetryAfter = Date.now() + responsesSocketRetryDelay
+                log.warn("responses websocket unavailable, falling back to http", {
+                  providerID: model.providerID,
+                  modelID: model.id,
+                  session: responsesSocketSession,
+                  retryAfter: responsesSocketRetryAfter,
+                  error: error instanceof Error ? error.message : String(error),
+                })
+              }
+
+              if (socket) {
+                const payload = { ...parsedBody, type: "response.create" }
+                delete (payload as any).stream
+                delete (payload as any).background
+
+                const encoder = new TextEncoder()
+                const stream = new ReadableStream<Uint8Array>({
+                  start(controller) {
+                    let done = false
+
+                    const releaseSocket = () => {
+                      const state = responsesSockets.get(responsesSocketSession)
+                      if (!state) return
+                      state.busy = false
+                      scheduleResponsesWebSocketIdleClose(responsesSocketSession, responsesSocketIdleTimeout)
+                    }
+
+                    const cleanup = () => {
+                      socket.removeEventListener("message", onMessage)
+                      socket.removeEventListener("close", onClose)
+                      socket.removeEventListener("error", onError)
+                      opts.signal?.removeEventListener("abort", onAbort)
+                    }
+
+                    const enqueueEvent = (value: unknown) => {
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`))
+                    }
+
+                    const finish = (error?: string) => {
+                      if (done) return
+                      done = true
+                      cleanup()
+                      releaseSocket()
+
+                      if (error) {
+                        enqueueEvent({
+                          type: "error",
+                          error: {
+                            type: "invalid_request_error",
+                            code: "websocket_transport_error",
+                            message: error,
+                          },
+                          status: 500,
+                        })
+                        closeResponsesWebSocket(responsesSocketSession, false, "stream-error")
+                      }
+
+                      controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+                      controller.close()
+                    }
+
+                    const parseMessage = (data: unknown) => {
+                      if (typeof data === "string") {
+                        try {
+                          return JSON.parse(data)
+                        } catch {
+                          return {
+                            type: "error",
+                            error: {
+                              type: "invalid_request_error",
+                              code: "websocket_invalid_json",
+                              message: data,
+                            },
+                            status: 500,
+                          }
+                        }
+                      }
+
+                      if (data instanceof ArrayBuffer) {
+                        const text = Buffer.from(new Uint8Array(data)).toString("utf8")
+                        try {
+                          return JSON.parse(text)
+                        } catch {
+                          return {
+                            type: "error",
+                            error: {
+                              type: "invalid_request_error",
+                              code: "websocket_invalid_json",
+                              message: text,
+                            },
+                            status: 500,
+                          }
+                        }
+                      }
+
+                      return data
+                    }
+
+                    const onMessage = (event: Event) => {
+                      const msg = parseMessage((event as MessageEvent).data)
+                      enqueueEvent(msg)
+                      const type = (msg as any)?.type
+                      if (type === "response.completed" || type === "response.incomplete" || type === "error") {
+                        finish()
+                      }
+                    }
+
+                    const onClose = (event: Event) => {
+                      const close = event as CloseEvent
+                      if (!done) finish(`websocket closed${close.code ? ` (${close.code})` : ""}`)
+                    }
+                    const onError = () => {
+                      if (!done) finish("websocket stream error")
+                    }
+                    const onAbort = () => {
+                      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+                        socket.close(1000, "request aborted")
+                      }
+                      finish("request aborted")
+                    }
+
+                    socket.addEventListener("message", onMessage)
+                    socket.addEventListener("close", onClose)
+                    socket.addEventListener("error", onError)
+                    opts.signal?.addEventListener("abort", onAbort, { once: true })
+
+                    try {
+                      socket.send(JSON.stringify(payload))
+                    } catch (error) {
+                      finish(error instanceof Error ? error.message : String(error))
+                    }
+                  },
+                  cancel() {
+                    const state = responsesSockets.get(responsesSocketSession)
+                    if (!state) return
+                    state.busy = false
+                    scheduleResponsesWebSocketIdleClose(responsesSocketSession, responsesSocketIdleTimeout)
+                  },
+                })
+
+                return new Response(stream, {
+                  status: 200,
+                  headers: {
+                    "content-type": "text/event-stream",
+                    "x-opencode-transport": "responses-websocket",
+                  },
+                })
               }
             }
 
-            const res = await fetchFn(input, {
+            const response = await fetchFn(input, {
               ...opts,
               // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
               timeout: false,
             })
+
+            const res =
+              isOpenAIResponsesRequest && parsedBody?.stream === true && !response.headers.get("x-opencode-transport")
+                ? new Response(response.body, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: (() => {
+                      const headers = new Headers(response.headers)
+                      headers.set("x-opencode-transport", "responses-http")
+                      return headers
+                    })(),
+                  })
+                : response
 
             if (!chunkAbortCtl) return res
             return wrapSSE(res, chunkTimeout, chunkAbortCtl)

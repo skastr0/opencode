@@ -10,8 +10,11 @@ export function isOverflow(input: { cfg: Config.Info; tokens: MessageV2.Assistan
   const context = input.model.limit.context
   if (context === 0) return false
 
-  const count =
-    input.tokens.total || input.tokens.input + input.tokens.output + input.tokens.cache.read + input.tokens.cache.write
+  const fallback = input.tokens.input + input.tokens.output + input.tokens.cache.read + input.tokens.cache.write
+  const codex = input.model.providerID === "openai" && input.model.id.includes("codex")
+  const count = codex
+    ? Math.max(input.tokens.total ?? 0, fallback + input.tokens.reasoning)
+    : input.tokens.total || fallback
 
   const reserved =
     input.cfg.compaction?.reserved ?? Math.min(COMPACTION_BUFFER, ProviderTransform.maxOutputTokens(input.model))

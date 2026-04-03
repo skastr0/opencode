@@ -40,6 +40,14 @@ export namespace LLM {
     abort: AbortSignal
   }
 
+  export function serviceTier(input: { provider: string; auth?: Auth.Info["type"]; model: string; fast?: boolean }) {
+    if (input.provider !== "openai") return
+    if (input.auth !== "oauth") return
+    if (input.model !== "gpt-5.4") return
+    if (input.fast !== true) return
+    return "priority" as const
+  }
+
   export type Event = Awaited<ReturnType<typeof stream>>["fullStream"] extends AsyncIterable<infer T> ? T : never
 
   export interface Interface {
@@ -140,6 +148,13 @@ export namespace LLM {
       mergeDeep(input.agent.options),
       mergeDeep(variant),
     )
+    const tier = serviceTier({
+      provider: provider.id,
+      auth: auth?.type,
+      model: input.model.id,
+      fast: input.user.fast,
+    })
+    if (tier) options.serviceTier = tier
     if (isOpenaiOauth) {
       options.instructions = system.join("\n")
     }

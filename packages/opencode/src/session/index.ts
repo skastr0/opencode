@@ -130,6 +130,7 @@ export namespace Session {
       workspaceID: WorkspaceID.zod.optional(),
       directory: z.string(),
       parentID: SessionID.zod.optional(),
+      depth: z.number().optional().describe("Nesting depth of session (0 for root, increments for subagent sessions)"),
       summary: z
         .object({
           additions: z.number(),
@@ -322,6 +323,7 @@ export namespace Session {
     readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info>
     readonly touch: (sessionID: SessionID) => Effect.Effect<void>
     readonly get: (id: SessionID) => Effect.Effect<Info>
+    readonly depth: (id: SessionID) => Effect.Effect<number>
     readonly share: (id: SessionID) => Effect.Effect<{ url: string }>
     readonly unshare: (id: SessionID) => Effect.Effect<void>
     readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
@@ -375,6 +377,29 @@ export namespace Session {
       const config = yield* Config.Service
       const scope = yield* Scope.Scope
 
+      const depth = Effect.fn("Session.depth")(function* (sessionID: SessionID) {
+        const ctx = yield* InstanceState.context
+        const seen = new Set<SessionID>()
+        let id: SessionID | undefined = sessionID
+        let result = 0
+        while (id) {
+          if (seen.has(id)) break
+          seen.add(id)
+          const current: SessionID = id
+          const row: { parent_id: SessionID | null } | undefined = yield* db((d) =>
+            d
+              .select({ parent_id: SessionTable.parent_id })
+              .from(SessionTable)
+              .where(and(eq(SessionTable.project_id, ctx.project.id), eq(SessionTable.id, current)))
+              .get(),
+          )
+          if (!row) break
+          result += 1
+          id = row.parent_id ?? undefined
+        }
+        return Math.max(0, result - 1)
+      })
+
       const createNext = Effect.fn("Session.createNext")(function* (input: {
         id?: SessionID
         title?: string
@@ -384,6 +409,7 @@ export namespace Session {
         permission?: Permission.Ruleset
       }) {
         const ctx = yield* InstanceState.context
+        const level = input.parentID ? (yield* depth(input.parentID)) + 1 : 0
         const result: Info = {
           id: SessionID.descending(input.id),
           slug: Slug.create(),
@@ -392,6 +418,7 @@ export namespace Session {
           directory: input.directory,
           workspaceID: input.workspaceID,
           parentID: input.parentID,
+          depth: level,
           title: input.title ?? createDefaultTitle(!!input.parentID),
           permission: input.permission,
           time: {
@@ -423,7 +450,10 @@ export namespace Session {
       const get = Effect.fn("Session.get")(function* (id: SessionID) {
         const row = yield* db((d) => d.select().from(SessionTable).where(eq(SessionTable.id, id)).get())
         if (!row) throw new NotFoundError({ message: `Session not found: ${id}` })
-        return fromRow(row)
+        return {
+          ...fromRow(row),
+          depth: yield* depth(id),
+        }
       })
 
       const share = Effect.fn("Session.share")(function* (id: SessionID) {
@@ -664,6 +694,7 @@ export namespace Session {
         fork,
         touch,
         get,
+        depth,
         share,
         unshare,
         setTitle,
@@ -708,6 +739,7 @@ export namespace Session {
 
   export const touch = fn(SessionID.zod, (id) => runPromise((svc) => svc.touch(id)))
   export const get = fn(SessionID.zod, (id) => runPromise((svc) => svc.get(id)))
+  export const depth = fn(SessionID.zod, (id) => runPromise((svc) => svc.depth(id)))
   export const share = fn(SessionID.zod, (id) => runPromise((svc) => svc.share(id)))
   export const unshare = fn(SessionID.zod, (id) => runPromise((svc) => svc.unshare(id)))
 

@@ -723,6 +723,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           time: { created: Date.now() },
           agent: lastUser.agent,
           model: lastUser.model,
+          fast: lastUser.fast,
         }
         yield* sessions.updateMessage(summaryUserMsg)
         yield* sessions.updatePart({
@@ -750,6 +751,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           throw error
         }
         const model = input.model ?? agent.model ?? (yield* lastModel(input.sessionID))
+        const fast = input.fast ?? agent.fast
         const userMsg: MessageV2.User = {
           id: MessageID.ascending(),
           sessionID: input.sessionID,
@@ -757,6 +759,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           role: "user",
           agent: input.agent,
           model: { providerID: model.providerID, modelID: model.modelID },
+          fast,
         }
         yield* sessions.updateMessage(userMsg)
         const userPart: MessageV2.Part = {
@@ -965,6 +968,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             ? yield* Effect.promise(() => Provider.getModel(model.providerID, model.modelID).catch(() => undefined))
             : undefined
         const variant = input.variant ?? (ag.variant && full?.variants?.[ag.variant] ? ag.variant : undefined)
+        const fast = input.fast ?? ag.fast
 
         const info: MessageV2.Info = {
           id: input.messageID ?? MessageID.ascending(),
@@ -977,6 +981,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           system: input.system,
           format: input.format,
           variant,
+          fast,
         }
 
         yield* Effect.addFinalizer(() => InstanceState.withALS(() => InstructionPrompt.clear(info.id)))
@@ -1265,6 +1270,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             model: input.model,
             messageID: input.messageID,
             variant: input.variant,
+            fast: input.fast,
           },
           { message: info, parts },
         )
@@ -1402,7 +1408,13 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               lastFinished.summary !== true &&
               (yield* compaction.isOverflow({ tokens: lastFinished.tokens, model }))
             ) {
-              yield* compaction.create({ sessionID, agent: lastUser.agent, model: lastUser.model, auto: true })
+              yield* compaction.create({
+                sessionID,
+                agent: lastUser.agent,
+                model: lastUser.model,
+                auto: true,
+                fast: lastUser.fast,
+              })
               continue
             }
 
@@ -1536,6 +1548,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     model: lastUser.model,
                     auto: true,
                     overflow: !handle.message.finish,
+                    fast: lastUser.fast,
                   })
                 }
                 return "continue" as const
@@ -1584,7 +1597,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
         const raw = input.arguments.match(argsRegex) ?? []
         const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
-        const templateCommand = yield* Effect.promise(async () => cmd.template)
+        const templateCommand = yield* Effect.promise(() => Promise.resolve(cmd.template))
 
         const placeholders = templateCommand.match(placeholderRegex) ?? []
         let last = 0
@@ -1676,6 +1689,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           agent: userAgent,
           parts,
           variant: input.variant,
+          fast: input.fast,
         })
         yield* bus.publish(Command.Event.Executed, {
           name: input.command,
@@ -1745,6 +1759,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     format: MessageV2.Format.optional(),
     system: z.string().optional(),
     variant: z.string().optional(),
+    fast: z.boolean().optional(),
     parts: z.array(
       z.discriminatedUnion("type", [
         MessageV2.TextPart.omit({
@@ -1821,6 +1836,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         modelID: ModelID.zod,
       })
       .optional(),
+    fast: z.boolean().optional(),
     command: z.string(),
   })
   export type ShellInput = z.infer<typeof ShellInput>
@@ -1837,6 +1853,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     arguments: z.string(),
     command: z.string(),
     variant: z.string().optional(),
+    fast: z.boolean().optional(),
     parts: z
       .array(
         z.discriminatedUnion("type", [

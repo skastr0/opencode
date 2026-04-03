@@ -3,6 +3,7 @@ import path from "path"
 import { tool, type ModelMessage } from "ai"
 import { Cause, Exit, Stream } from "effect"
 import z from "zod"
+import { Auth } from "../../src/auth"
 import { makeRuntime } from "../../src/effect/run-service"
 import { LLM } from "../../src/session/llm"
 import { Instance } from "../../src/project/instance"
@@ -100,6 +101,17 @@ describe("session.llm.hasToolCalls", () => {
       },
     ] as ModelMessage[]
     expect(LLM.hasToolCalls(messages)).toBe(true)
+  })
+})
+
+describe("session.llm.serviceTier", () => {
+  test("returns priority only for OpenAI OAuth gpt-5.4 fast requests", () => {
+    expect(LLM.serviceTier({ provider: "openai", auth: "oauth", model: "gpt-5.4", fast: true })).toBe("priority")
+
+    expect(LLM.serviceTier({ provider: "openai", auth: "api", model: "gpt-5.4", fast: true })).toBeUndefined()
+    expect(LLM.serviceTier({ provider: "anthropic", auth: "oauth", model: "gpt-5.4", fast: true })).toBeUndefined()
+    expect(LLM.serviceTier({ provider: "openai", auth: "oauth", model: "gpt-5.2", fast: true })).toBeUndefined()
+    expect(LLM.serviceTier({ provider: "openai", auth: "oauth", model: "gpt-5.4", fast: false })).toBeUndefined()
   })
 })
 
@@ -690,6 +702,7 @@ describe("session.llm.stream", () => {
                 options: {
                   apiKey: "test-openai-key",
                   baseURL: `${server.url.origin}/v1`,
+                  websocketMode: false,
                 },
               },
             },
@@ -812,6 +825,7 @@ describe("session.llm.stream", () => {
                 options: {
                   apiKey: "test-openai-key",
                   baseURL: `${server.url.origin}/v1`,
+                  websocketMode: false,
                 },
               },
             },

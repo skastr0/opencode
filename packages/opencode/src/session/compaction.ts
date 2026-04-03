@@ -55,6 +55,7 @@ export namespace SessionCompaction {
       model: { providerID: ProviderID; modelID: ModelID }
       auto: boolean
       overflow?: boolean
+      fast?: boolean
     }) => Effect.Effect<void>
   }
 
@@ -290,6 +291,7 @@ When constructing the summary, try to stick to this template:
               tools: original.tools,
               system: original.system,
               variant: original.variant,
+              fast: original.fast,
             })
             for (const part of replay.parts) {
               if (part.type === "compaction") continue
@@ -314,6 +316,7 @@ When constructing the summary, try to stick to this template:
               time: { created: Date.now() },
               agent: userMessage.agent,
               model: userMessage.model,
+              fast: userMessage.fast,
             })
             const text =
               (input.overflow
@@ -346,6 +349,7 @@ When constructing the summary, try to stick to this template:
         model: { providerID: ProviderID; modelID: ModelID }
         auto: boolean
         overflow?: boolean
+        fast?: boolean
       }) {
         const msg = yield* session.updateMessage({
           id: MessageID.ascending(),
@@ -353,6 +357,7 @@ When constructing the summary, try to stick to this template:
           model: input.model,
           sessionID: input.sessionID,
           agent: input.agent,
+          fast: input.fast,
           time: { created: Date.now() },
         })
         yield* session.updatePart({
@@ -415,6 +420,7 @@ When constructing the summary, try to stick to this template:
       model: z.object({ providerID: ProviderID.zod, modelID: ModelID.zod }),
       auto: z.boolean(),
       overflow: z.boolean().optional(),
+      fast: z.boolean().optional(),
     }),
     (input) => runPromise((svc) => svc.create(input)),
   )

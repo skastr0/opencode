@@ -64,7 +64,6 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
 
       const hasTaskPermission = agent.permission.some((rule) => rule.permission === "task")
-      const hasTodoWritePermission = agent.permission.some((rule) => rule.permission === "todowrite")
 
       const session = await iife(async () => {
         if (params.task_id) {
@@ -76,15 +75,16 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           parentID: ctx.sessionID,
           title: params.description + ` (@${agent.name} subagent)`,
           permission: [
-            ...(hasTodoWritePermission
-              ? []
-              : [
-                  {
-                    permission: "todowrite" as const,
-                    pattern: "*" as const,
-                    action: "deny" as const,
-                  },
-                ]),
+            {
+              permission: "todowrite",
+              pattern: "*",
+              action: "deny",
+            },
+            {
+              permission: "todoread",
+              pattern: "*",
+              action: "deny",
+            },
             ...(hasTaskPermission
               ? []
               : [
@@ -126,6 +126,9 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       ctx.abort.addEventListener("abort", cancel)
       using _ = defer(() => ctx.abort.removeEventListener("abort", cancel))
       const promptParts = await SessionPrompt.resolvePromptParts(params.prompt)
+      const maxDepth = config.experimental?.max_delegation_depth ?? 0
+      const level = await Session.depth(session.id)
+      const canDelegate = level < maxDepth
 
       const result = await SessionPrompt.prompt({
         messageID,
@@ -136,8 +139,9 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         },
         agent: agent.name,
         tools: {
-          ...(hasTodoWritePermission ? {} : { todowrite: false }),
-          ...(hasTaskPermission ? {} : { task: false }),
+          todowrite: false,
+          todoread: false,
+          ...(hasTaskPermission && canDelegate ? {} : { task: false }),
           ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((t) => [t, false])),
         },
         parts: promptParts,

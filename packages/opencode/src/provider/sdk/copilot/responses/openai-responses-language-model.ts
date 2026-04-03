@@ -727,6 +727,9 @@ export class OpenAIResponsesLanguageModel implements LanguageModelV3 {
       openai: { responseId: response.id },
     }
 
+    const transport = parseResponsesTransport(responseHeaders)
+    providerMetadata.openai.transport = transport
+
     if (logprobs.length > 0) {
       providerMetadata.openai.logprobs = logprobs
     }
@@ -851,6 +854,7 @@ export class OpenAIResponsesLanguageModel implements LanguageModelV3 {
     let currentTextId: string | null = null
 
     let serviceTier: string | undefined
+    const transport = parseResponsesTransport(responseHeaders)
 
     return {
       stream: response.pipeThrough(
@@ -955,6 +959,7 @@ export class OpenAIResponsesLanguageModel implements LanguageModelV3 {
                   providerMetadata: {
                     openai: {
                       itemId: value.item.id,
+                      transport,
                     },
                   },
                 })
@@ -1208,7 +1213,10 @@ export class OpenAIResponsesLanguageModel implements LanguageModelV3 {
                   type: "text-start",
                   id: currentTextId,
                   providerMetadata: {
-                    openai: { itemId: value.item_id },
+                    openai: {
+                      itemId: value.item_id,
+                      transport,
+                    },
                   },
                 })
               }
@@ -1317,6 +1325,8 @@ export class OpenAIResponsesLanguageModel implements LanguageModelV3 {
             if (serviceTier !== undefined) {
               providerMetadata.openai.serviceTier = serviceTier
             }
+
+            providerMetadata.openai.transport = transport
 
             controller.enqueue({
               type: "finish",
@@ -1767,3 +1777,22 @@ const openaiResponsesProviderOptionsSchema = z.object({
 })
 
 export type OpenAIResponsesProviderOptions = z.infer<typeof openaiResponsesProviderOptionsSchema>
+
+function parseResponsesTransport(headers: unknown): "websocket" | "http" {
+  let value: string | null | undefined
+
+  if (headers instanceof Headers) {
+    value = headers.get("x-opencode-transport")
+  } else if (headers && typeof headers === "object") {
+    const key = Object.keys(headers as Record<string, unknown>).find(
+      (item) => item.toLowerCase() === "x-opencode-transport",
+    )
+    if (key) {
+      const raw = (headers as Record<string, unknown>)[key]
+      value = typeof raw === "string" ? raw : null
+    }
+  }
+
+  if (value === "responses-websocket") return "websocket"
+  return "http"
+}
